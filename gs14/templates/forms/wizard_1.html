@@ -1,0 +1,146 @@
+<!-- templates/forms/wizard_1.html -->
+{% extends "base.html" %}
+
+{% block title %}Заполнение данных - Шаг 2 из {{ wizard.steps.count }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        Шаг {{ wizard.steps.step1 }} из {{ wizard.steps.count }}: Заполнение информации
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <!-- Серийный номер из контекста -->
+                    <div class="alert alert-secondary">
+                        <strong>🔢 Серийный номер:</strong> 
+                        <span class="badge bg-dark fs-6">{{ serial_number|default:"Не указан" }}</span>
+                    </div>
+                    
+                    <!-- Информация о существовании объекта -->
+                    {% if object_exists %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Внимание!</strong> Объект с таким серийным номером уже существует в базе данных.
+                            <ul class="mt-2 mb-0">
+                                <li>Если вы оставите поля пустыми, существующие значения сохранятся</li>
+                                <li>Если вы заполните поля, новые значения заменят старые</li>
+                                <li>Если вы загрузите новое изображение, старое будет заменено</li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-plus-circle"></i>
+                            <strong>Новая запись!</strong> Будет создан новый объект с указанными данными.
+                        </div>
+                    {% endif %}
+                    
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {{ wizard.management_form }}
+                        
+                        {% for field in wizard.form %}
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label fw-bold">
+                                    {{ field.label }}
+                                    {% if field.field.required %}
+                                        <span class="text-danger">*</span>
+                                    {% endif %}
+                                </label>
+                                
+                                {{ field }}
+                                
+                                {% if field.help_text %}
+                                    <div class="form-text text-muted small">{{ field.help_text }}</div>
+                                {% endif %}
+                                
+                                {% if field.errors %}
+                                    <div class="alert alert-danger mt-1">
+                                        {% for error in field.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <div>
+                                {% if wizard.steps.prev %}
+                                    <button type="submit" name="wizard_goto_step" value="{{ wizard.steps.prev }}" 
+                                            class="btn btn-secondary">
+                                        ← Назад
+                                    </button>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <a href="{% url 'control_list' %}" class="btn btn-danger me-2">
+                                    ✖ Отмена
+                                </a>
+                                <button type="submit" class="btn btn-success">
+                                    ✓ Сохранить
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        padding: 8px 12px;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    
+    textarea.form-control {
+        resize: vertical;
+        min-height: 100px;
+    }
+    
+    .alert-secondary {
+        border-left: 4px solid #6c757d;
+    }
+    
+    .alert-warning {
+        border-left: 4px solid #ffc107;
+    }
+    
+    .alert-success {
+        border-left: 4px solid #28a745;
+    }
+    
+    .badge {
+        font-size: 1rem;
+        padding: 5px 10px;
+    }
+    
+    .card {
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .btn {
+        transition: all 0.3s;
+    }
+    
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+</style>
+{% endblock %}

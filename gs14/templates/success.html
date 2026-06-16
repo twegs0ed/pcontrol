@@ -1,0 +1,13 @@
+<!-- templates/success.html -->
+
+
+{% block content %}
+<div class="container">
+    <div class="alert alert-success">
+        <h2>Успешно!</h2>
+        <p>Данные успешно сохранены.</p>
+        <a href="{% url 'my_wizard' %}" class="btn btn-primary">Создать новую запись</a>
+        <a href="/admin/" class="btn btn-secondary">Перейти в админку</a>
+    </div>
+</div>
+{% endblock %}
