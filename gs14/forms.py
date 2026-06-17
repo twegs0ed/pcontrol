@@ -18,7 +18,16 @@ class SerialNumberForm(forms.Form):
 class MainInfoForm(forms.ModelForm):
     class Meta:
         model = Control
-        fields = ['description', 'title1', 'image1']
+        fields = [
+            'description', 
+            'title1', 'image1', 
+            'title2', 'image2', 
+            'title3', 'image3', 
+            'title4', 'image4',
+            'title5', 'image5', 
+            'title6', 'image6',
+            'title7', 'image7'
+        ]
         widgets = {
             'description': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -26,24 +35,26 @@ class MainInfoForm(forms.ModelForm):
                 'placeholder': 'Введите описание объекта...',
                 'id': 'id_description'
             }),
-            'title1': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Введите заголовок',
-                'id': 'id_title1'
-            }),
-            'image1': forms.ClearableFileInput(attrs={
-                'class': 'form-control',
-                'accept': 'image/*',
-                'id': 'id_image1'
-            }),
         }
-        labels = {
-            'description': 'Описание',
-            'title1': 'Заголовок',
-            'image1': 'Изображение',
-        }
-        help_texts = {
-            'description': 'Подробное описание объекта (до 500 символов)',
-            'title1': 'Краткий заголовок объекта',
-            'image1': 'Загрузите изображение в формате JPG, PNG или GIF',
-        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Общие атрибуты для всех текстовых полей
+        common_widget = forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите заголовок'
+        })
+        
+        # Применяем ко всем текстовым полям
+        text_fields = ['title1', 'title2', 'title3', 'title4', 'title5', 'title6', 'title7']
+        for field_name in text_fields:
+            self.fields[field_name].widget = common_widget
+        
+        # Для полей изображений добавляем классы
+        image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7']
+        for field_name in image_fields:
+            if field_name in self.fields:
+                self.fields[field_name].widget.attrs.update({
+                    'class': 'form-control',
+                    'accept': 'image/*'
+                })

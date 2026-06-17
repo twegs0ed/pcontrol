@@ -1,60 +1,45 @@
-<!-- templates/forms/wizard_0.html -->
+<!-- forms/wizard_0.html -->
 {% extends "base.html" %}
-
-{% block title %}Ввод серийного номера - Шаг 1 из {{ wizard.steps.count }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-md-6">
             <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">
-                        Шаг {{ wizard.steps.step1 }} из {{ wizard.steps.count }}: Ввод серийного номера
-                    </h3>
+                <div class="card-header">
+                    <h3>Создание нового объекта</h3>
                 </div>
                 <div class="card-body">
-                    <form action="" method="post">
+                    <p class="text-muted">Шаг 1 из 2: Введите серийный номер</p>
+                    
+                    <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         {{ wizard.management_form }}
                         
-                        {% if wizard.form.non_field_errors %}
-                            <div class="alert alert-danger">
-                                {{ wizard.form.non_field_errors }}
-                            </div>
-                        {% endif %}
-                        
-                        <div class="form-group mb-4">
-                            <label for="{{ wizard.form.serial_number.id_for_label }}" class="form-label h5">
-                                {{ wizard.form.serial_number.label }}
+                        <div class="form-group mb-3">
+                            <label for="{{ form.serial_number.id_for_label }}" class="form-label fw-bold">
+                                <i class="fas fa-barcode"></i> Серийный номер
                             </label>
-                            {{ wizard.form.serial_number }}
-                            {% if wizard.form.serial_number.help_text %}
-                                <small class="form-text text-muted">{{ wizard.form.serial_number.help_text }}</small>
-                            {% endif %}
-                            {% if wizard.form.serial_number.errors %}
+                            {{ form.serial_number }}
+                            {% if form.serial_number.errors %}
                                 <div class="alert alert-danger mt-2">
-                                    {{ wizard.form.serial_number.errors }}
+                                    {{ form.serial_number.errors }}
                                 </div>
                             {% endif %}
-                        </div>
-                        
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i>
-                            <strong>Информация:</strong> После ввода серийного номера система проверит его наличие в базе данных.
-                            <ul class="mt-2 mb-0">
-                                <li>Если номер <strong>найден</strong> - вы сможете дополнить или изменить данные</li>
-                                <li>Если номер <strong>не найден</strong> - будет создана новая запись</li>
-                            </ul>
+                            {% if form.serial_number.help_text %}
+                                <small class="form-text text-muted">{{ form.serial_number.help_text }}</small>
+                            {% endif %}
                         </div>
                         
                         <div class="d-flex justify-content-between mt-4">
-                            <a href="{% url 'control_list' %}" class="btn btn-danger">
-                                ← Отмена
+                            <div>
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    Далее <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                            <a href="{% url 'gs14_control_list' %}" class="btn btn-danger">
+                                <i class="fas fa-times"></i> Отмена
                             </a>
-                            <button type="submit" class="btn btn-primary">
-                                Далее →
-                            </button>
                         </div>
                     </form>
                 </div>
@@ -62,4 +47,21 @@
         </div>
     </div>
 </div>
+
+{% block extra_css %}
+<style>
+    .form-control {
+        border-radius: 8px;
+        padding: 12px 15px;
+        border: 2px solid #dee2e6;
+        transition: all 0.3s ease;
+        font-size: 1.1rem;
+    }
+    
+    .form-control:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}
 {% endblock %}

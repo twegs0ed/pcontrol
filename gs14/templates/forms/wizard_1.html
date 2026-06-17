@@ -6,35 +6,43 @@
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-md-10">
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h3 class="mb-0">
-                        Шаг {{ wizard.steps.step1 }} из {{ wizard.steps.count }}: Заполнение информации
+                        {% if is_edit_mode %}
+                            <i class="fas fa-edit"></i> Редактирование объекта
+                        {% else %}
+                            <i class="fas fa-plus-circle"></i> Создание нового объекта
+                        {% endif %}
+                        - Шаг {{ wizard.steps.step1 }} из {{ wizard.steps.count }}
                     </h3>
                 </div>
                 <div class="card-body">
-                    <!-- Серийный номер из контекста -->
+                    <!-- Серийный номер -->
                     <div class="alert alert-secondary">
                         <strong>🔢 Серийный номер:</strong> 
                         <span class="badge bg-dark fs-6">{{ serial_number|default:"Не указан" }}</span>
+                        {% if is_edit_mode %}
+                            <span class="badge bg-warning text-dark ms-2">Режим редактирования</span>
+                        {% endif %}
                     </div>
                     
                     <!-- Информация о существовании объекта -->
                     {% if object_exists %}
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle"></i>
-                            <strong>Внимание!</strong> Объект с таким серийным номером уже существует в базе данных.
+                            <strong>Внимание!</strong> Объект с таким серийным номером уже существует.
                             <ul class="mt-2 mb-0">
-                                <li>Если вы оставите поля пустыми, существующие значения сохранятся</li>
-                                <li>Если вы заполните поля, новые значения заменят старые</li>
-                                <li>Если вы загрузите новое изображение, старое будет заменено</li>
+                                <li>Оставьте поля пустыми, чтобы сохранить текущие значения</li>
+                                <li>Заполните поля, чтобы обновить данные</li>
+                                <li>Загрузите новые изображения для замены старых</li>
                             </ul>
                         </div>
                     {% else %}
                         <div class="alert alert-success">
                             <i class="fas fa-plus-circle"></i>
-                            <strong>Новая запись!</strong> Будет создан новый объект с указанными данными.
+                            <strong>Новая запись!</strong> Будет создан новый объект.
                         </div>
                     {% endif %}
                     
@@ -42,46 +50,354 @@
                         {% csrf_token %}
                         {{ wizard.management_form }}
                         
-                        {% for field in wizard.form %}
-                            <div class="mb-3">
-                                <label for="{{ field.id_for_label }}" class="form-label fw-bold">
-                                    {{ field.label }}
-                                    {% if field.field.required %}
-                                        <span class="text-danger">*</span>
-                                    {% endif %}
-                                </label>
-                                
-                                {{ field }}
-                                
-                                {% if field.help_text %}
-                                    <div class="form-text text-muted small">{{ field.help_text }}</div>
-                                {% endif %}
-                                
-                                {% if field.errors %}
-                                    <div class="alert alert-danger mt-1">
-                                        {% for error in field.errors %}
-                                            {{ error }}
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                            </div>
-                        {% endfor %}
+                        <!-- Скрытое поле для серийного номера при редактировании -->
+                        {% if is_edit_mode %}
+                            <input type="hidden" name="{{ wizard.form.prefix }}-serial_number" value="{{ serial_from_url }}">
+                        {% endif %}
                         
+                        <!-- Поле Описание -->
+                        <div class="mb-4">
+                            <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
+                                <i class="fas fa-align-left"></i> {{ form.description.label }}
+                            </label>
+                            {{ form.description }}
+                            {% if form.description.help_text %}
+                                <div class="form-text text-muted small">{{ form.description.help_text }}</div>
+                            {% endif %}
+                            {% if form.description.errors %}
+                                <div class="alert alert-danger mt-1">{{ form.description.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Группа 1 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 1 - Вид внутри</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.title1.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title1.label }}
+                                            </label>
+                                            {{ form.title1 }}
+                                            {% if form.title1.help_text %}
+                                                <div class="form-text text-muted small">{{ form.title1.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.image1.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image1.label }}
+                                            </label>
+                                            {% if is_edit_mode and current_images.image1 %}
+                                                <div class="mb-2">
+                                                    <img src="{{ current_images.image1 }}" alt="Текущее изображение" 
+                                                         style="max-width: 150px; max-height: 150px;" class="img-thumbnail">
+                                                    <br>
+                                                    <small class="text-muted">Текущее изображение</small>
+                                                </div>
+                                            {% endif %}
+                                            {{ form.image1 }}
+                                            {% if form.image1.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image1.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image1.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image1.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 2 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 2 - Вид платы</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.title2.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title2.label }}
+                                            </label>
+                                            {{ form.title2 }}
+                                            {% if form.title2.help_text %}
+                                                <div class="form-text text-muted small">{{ form.title2.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.image2.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image2.label }}
+                                            </label>
+                                            {% if is_edit_mode and current_images.image2 %}
+                                                <div class="mb-2">
+                                                    <img src="{{ current_images.image2 }}" alt="Текущее изображение" 
+                                                         style="max-width: 150px; max-height: 150px;" class="img-thumbnail">
+                                                    <br>
+                                                    <small class="text-muted">Текущее изображение</small>
+                                                </div>
+                                            {% endif %}
+                                            {{ form.image2 }}
+                                            {% if form.image2.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image2.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image2.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image2.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 3 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 3 - Вид спереди</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.title3.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title3.label }}
+                                            </label>
+                                            {{ form.title3 }}
+                                            {% if form.title3.help_text %}
+                                                <div class="form-text text-muted small">{{ form.title3.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.image3.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image3.label }}
+                                            </label>
+                                            {% if is_edit_mode and current_images.image3 %}
+                                                <div class="mb-2">
+                                                    <img src="{{ current_images.image3 }}" alt="Текущее изображение" 
+                                                         style="max-width: 150px; max-height: 150px;" class="img-thumbnail">
+                                                    <br>
+                                                    <small class="text-muted">Текущее изображение</small>
+                                                </div>
+                                            {% endif %}
+                                            {{ form.image3 }}
+                                            {% if form.image3.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image3.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image3.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image3.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 4 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 4 - Вид справа</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.title4.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title4.label }}
+                                            </label>
+                                            {{ form.title4 }}
+                                            {% if form.title4.help_text %}
+                                                <div class="form-text text-muted small">{{ form.title4.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.image4.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image4.label }}
+                                            </label>
+                                            {% if is_edit_mode and current_images.image4 %}
+                                                <div class="mb-2">
+                                                    <img src="{{ current_images.image4 }}" alt="Текущее изображение" 
+                                                         style="max-width: 150px; max-height: 150px;" class="img-thumbnail">
+                                                    <br>
+                                                    <small class="text-muted">Текущее изображение</small>
+                                                </div>
+                                            {% endif %}
+                                            {{ form.image4 }}
+                                            {% if form.image4.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image4.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image4.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image4.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 5 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 5 - Вид слева</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.title5.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title5.label }}
+                                            </label>
+                                            {{ form.title5 }}
+                                            {% if form.title5.help_text %}
+                                                <div class="form-text text-muted small">{{ form.title5.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.image5.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image5.label }}
+                                            </label>
+                                            {% if is_edit_mode and current_images.image5 %}
+                                                <div class="mb-2">
+                                                    <img src="{{ current_images.image5 }}" alt="Текущее изображение" 
+                                                         style="max-width: 150px; max-height: 150px;" class="img-thumbnail">
+                                                    <br>
+                                                    <small class="text-muted">Текущее изображение</small>
+                                                </div>
+                                            {% endif %}
+                                            {{ form.image5 }}
+                                            {% if form.image5.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image5.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image5.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image5.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 6 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 6 - Вид сзади</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.title6.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title6.label }}
+                                            </label>
+                                            {{ form.title6 }}
+                                            {% if form.title6.help_text %}
+                                                <div class="form-text text-muted small">{{ form.title6.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.image6.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image6.label }}
+                                            </label>
+                                            {% if is_edit_mode and current_images.image6 %}
+                                                <div class="mb-2">
+                                                    <img src="{{ current_images.image6 }}" alt="Текущее изображение" 
+                                                         style="max-width: 150px; max-height: 150px;" class="img-thumbnail">
+                                                    <br>
+                                                    <small class="text-muted">Текущее изображение</small>
+                                                </div>
+                                            {% endif %}
+                                            {{ form.image6 }}
+                                            {% if form.image6.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image6.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image6.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image6.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 7 - Комплектность -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 7 - Комплектность</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.title7.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title7.label }}
+                                            </label>
+                                            {{ form.title7 }}
+                                            {% if form.title7.help_text %}
+                                                <div class="form-text text-muted small">{{ form.title7.help_text }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="{{ form.image7.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image7.label }}
+                                            </label>
+                                            {% if is_edit_mode and current_images.image7 %}
+                                                <div class="mb-2">
+                                                    <img src="{{ current_images.image7 }}" alt="Текущее изображение" 
+                                                         style="max-width: 150px; max-height: 150px;" class="img-thumbnail">
+                                                    <br>
+                                                    <small class="text-muted">Текущее изображение</small>
+                                                </div>
+                                            {% endif %}
+                                            {{ form.image7 }}
+                                            {% if form.image7.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image7.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image7.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image7.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Кнопки -->
                         <div class="d-flex justify-content-between mt-4">
                             <div>
                                 {% if wizard.steps.prev %}
                                     <button type="submit" name="wizard_goto_step" value="{{ wizard.steps.prev }}" 
                                             class="btn btn-secondary">
-                                        ← Назад
+                                        <i class="fas fa-arrow-left"></i> Назад
                                     </button>
                                 {% endif %}
                             </div>
                             <div>
-                                <a href="{% url 'control_list' %}" class="btn btn-danger me-2">
-                                    ✖ Отмена
+                                <a href="{% url 'gs14_control_list' %}" class="btn btn-danger me-2">
+                                    <i class="fas fa-times"></i> Отмена
                                 </a>
                                 <button type="submit" class="btn btn-success">
-                                    ✓ Сохранить
+                                    <i class="fas fa-save"></i> 
+                                    {% if is_edit_mode %}
+                                        Сохранить изменения
+                                    {% else %}
+                                        Создать объект
+                                    {% endif %}
                                 </button>
                             </div>
                         </div>
@@ -111,27 +427,14 @@
         min-height: 100px;
     }
     
-    .alert-secondary {
-        border-left: 4px solid #6c757d;
-    }
-    
-    .alert-warning {
-        border-left: 4px solid #ffc107;
-    }
-    
-    .alert-success {
-        border-left: 4px solid #28a745;
-    }
-    
-    .badge {
-        font-size: 1rem;
-        padding: 5px 10px;
-    }
-    
     .card {
-        border-radius: 15px;
+        border-radius: 10px;
         overflow: hidden;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card-header {
+        font-weight: 500;
     }
     
     .btn {
@@ -141,6 +444,15 @@
     .btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+    
+    .img-thumbnail {
+        border: 2px solid #dee2e6;
+        padding: 3px;
+    }
+    
+    .alert ul {
+        padding-left: 20px;
     }
 </style>
 {% endblock %}
