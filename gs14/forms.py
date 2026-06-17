@@ -16,13 +16,13 @@ class ControlForm(forms.ModelForm):
                 'rows': 5,
                 'placeholder': 'Введите описание объекта...'
             }),
-            'title1': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
-            'title2': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
-            'title3': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
-            'title4': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
-            'title5': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
-            'title6': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
-            'title7': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
+            'title1': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Комментарий приемки'}),
+            'title2': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Комментарий приемки'}),
+            'title3': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Комментарий приемки'}),
+            'title4': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Комментарий приемки'}),
+            'title5': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Комментарий приемки'}),
+            'title6': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Комментарий приемки'}),
+            'title7': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Комментарий приемки'}),
         }
     
     def __init__(self, *args, **kwargs):
@@ -34,7 +34,7 @@ class ControlForm(forms.ModelForm):
             if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update({
                     'class': 'form-control',
-                    'placeholder': 'Введите заголовок'
+                    'placeholder': 'Комментарий приемки'
                 })
         
         # === ВАЖНО: Настройка полей изображений с поддержкой камеры ===
