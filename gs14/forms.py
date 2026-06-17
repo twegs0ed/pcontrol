@@ -1,57 +1,41 @@
-# forms.py
 from django import forms
 from .models import Control
 
-class SerialNumberForm(forms.Form):
-    serial_number = forms.CharField(
-        max_length=100, 
-        label='Серийный номер',
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Введите серийный номер',
-            'autofocus': True,
-        }),
-        help_text='Введите уникальный серийный номер устройства'
-    )
-
-class MainInfoForm(forms.ModelForm):
+class ControlForm(forms.ModelForm):
     class Meta:
         model = Control
-        fields = [
-            'description', 
-            'title1', 'image1', 
-            'title2', 'image2', 
-            'title3', 'image3', 
-            'title4', 'image4',
-            'title5', 'image5', 
-            'title6', 'image6',
-            'title7', 'image7'
-        ]
+        fields = '__all__'
+        exclude = ['created_at', 'updated_at']
         widgets = {
+            'serial_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите серийный номер',
+            }),
             'description': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 5,
                 'placeholder': 'Введите описание объекта...'
             }),
+            'title1': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
+            'title2': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
+            'title3': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
+            'title4': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
+            'title5': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
+            'title6': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
+            'title7': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
+            'image1': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'image2': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'image3': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'image4': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'image5': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'image6': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'image7': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Настройка всех текстовых полей
-        text_fields = ['title1', 'title2', 'title3', 'title4', 'title5', 'title6', 'title7']
-        for field_name in text_fields:
-            self.fields[field_name].widget.attrs.update({
-                'class': 'form-control',
-                'placeholder': f'Введите заголовок'
-            })
-        
-        # Настройка всех полей для изображений с поддержкой камеры
-        image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7']
-        for field_name in image_fields:
-            self.fields[field_name].widget.attrs.update({
-                'class': 'form-control',
-                'accept': 'image/*',  # Разрешаем только изображения
-                'capture': 'environment',  # Запускаем камеру
-                'style': 'padding: 10px;'
-            })
+        # Делаем поля необязательными при редактировании
+        if self.instance and self.instance.pk:
+            for field in self.fields.values():
+                field.required = False

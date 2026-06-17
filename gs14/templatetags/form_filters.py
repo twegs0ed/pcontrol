@@ -1,22 +1,23 @@
-# templatetags/form_filters.py (создайте файл)
 from django import template
 
 register = template.Library()
 
 @register.filter
-def get_item(dictionary, key):
-    """Получить значение из словаря по ключу"""
-    if dictionary is None:
-        return None
-    return dictionary.get(key)
-
-@register.filter
 def get_field(form, field_name):
-    """Получить поле формы по имени"""
-    return form[field_name] if field_name in form.fields else None
+    """Получить поле из формы по имени"""
+    try:
+        if form and hasattr(form, 'fields') and field_name in form.fields:
+            return form[field_name]
+    except Exception as e:
+        print(f"Ошибка в get_field: {e}")
+    return None
 
 @register.filter
-def get_image_field(form, num):
-    """Получить поле изображения по номеру"""
-    field_name = f"image{num}"
-    return form[field_name] if field_name in form.fields else None
+def get_attr(obj, attr_name):
+    """Получить атрибут объекта по имени"""
+    try:
+        if obj and hasattr(obj, attr_name):
+            return getattr(obj, attr_name)
+    except Exception as e:
+        print(f"Ошибка в get_attr: {e}")
+    return None

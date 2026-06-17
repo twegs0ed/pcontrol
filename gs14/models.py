@@ -1,6 +1,17 @@
-# models.py
 from django.db import models
-from webcampicture.fields import WebcamPictureField
+import os
+from django.utils.text import slugify
+from django.utils import timezone
+import uuid
+
+def get_upload_path(instance, filename):
+    """Генерация пути для загрузки файлов"""
+    ext = os.path.splitext(filename)[1].lower()
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+    unique_id = uuid.uuid4().hex[:8]
+    name = slugify(os.path.splitext(filename)[0]) or 'image'
+    new_filename = f"{name}_{timestamp}_{unique_id}{ext}"
+    return os.path.join('controls/', new_filename)
 
 class Control(models.Model):
     serial_number = models.CharField(
@@ -15,99 +26,92 @@ class Control(models.Model):
         verbose_name='Описание'
     )
     
-    # Вид внутри
     title1 = models.CharField(
         max_length=200, 
         blank=True, 
         null=True,
         verbose_name='Вид внутри'
     )
-    image1 = WebcamPictureField(
-        upload_to='controls/',
+    image1 = models.ImageField(
+        upload_to=get_upload_path,
         blank=True,
         null=True,
         verbose_name='Фото вида внутри'
     )
 
-    # Вид платы
     title2 = models.CharField(
         max_length=200, 
         blank=True, 
         null=True,
         verbose_name='Вид платы'
     )
-    image2 = WebcamPictureField(
-        upload_to='controls/',
+    image2 = models.ImageField(
+        upload_to=get_upload_path,
         blank=True,
         null=True,
         verbose_name='Фото вида платы'
     )
 
-    # Вид спереди
     title3 = models.CharField(
         max_length=200, 
         blank=True, 
         null=True,
         verbose_name='Вид спереди'
     )
-    image3 = WebcamPictureField(
-        upload_to='controls/',
+    image3 = models.ImageField(
+        upload_to=get_upload_path,
         blank=True,
         null=True,
         verbose_name='Фото вида спереди'
     )
 
-    # Вид справа
     title4 = models.CharField(
         max_length=200, 
         blank=True, 
         null=True,
         verbose_name='Вид справа'
     )
-    image4 = WebcamPictureField(
-        upload_to='controls/',
+    image4 = models.ImageField(
+        upload_to=get_upload_path,
         blank=True,
         null=True,
         verbose_name='Фото вида справа'
     )
 
-    # Вид слева
     title5 = models.CharField(
         max_length=200, 
         blank=True, 
         null=True,
         verbose_name='Вид слева'
     )
-    image5 = WebcamPictureField(
-        upload_to='controls/',
+    image5 = models.ImageField(
+        upload_to=get_upload_path,
         blank=True,
         null=True,
         verbose_name='Фото вида слева'
     )
 
-    # Вид сзади
     title6 = models.CharField(
         max_length=200, 
         blank=True, 
         null=True,
         verbose_name='Вид сзади'
     )
-    image6 = WebcamPictureField(
-        upload_to='controls/',
+    image6 = models.ImageField(
+        upload_to=get_upload_path,
         blank=True,
         null=True,
         verbose_name='Фото вида сзади'
     )
 
-    # Комплектность - ИСПРАВЛЕНО: теперь title7 и image7
     title7 = models.CharField(
         max_length=200, 
         blank=True, 
         null=True,
         verbose_name='Комплектность'
     )
-    image7 = WebcamPictureField(
-        upload_to='controls/',
+    image7 = models.ImageField(
+        upload_to=get_upload_path,
         blank=True,
         null=True,
         verbose_name='Фото комплектности'

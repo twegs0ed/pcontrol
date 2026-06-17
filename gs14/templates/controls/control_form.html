@@ -1,0 +1,569 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        {% if object %}
+                            <i class="fas fa-edit"></i> Редактирование объекта
+                        {% else %}
+                            <i class="fas fa-plus-circle"></i> Создание нового объекта
+                        {% endif %}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="control-form">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                <strong>Ошибка!</strong> Пожалуйста, исправьте следующие ошибки:
+                                <ul>
+                                    {% for field, errors in form.errors.items %}
+                                        {% for error in errors %}
+                                            <li>{{ field }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Серийный номер -->
+                        <div class="form-group mb-3">
+                            <label for="{{ form.serial_number.id_for_label }}" class="form-label fw-bold">
+                                {{ form.serial_number.label }}
+                            </label>
+                            {{ form.serial_number }}
+                            {% if form.serial_number.help_text %}
+                                <div class="form-text text-muted small">{{ form.serial_number.help_text }}</div>
+                            {% endif %}
+                            {% if form.serial_number.errors %}
+                                <div class="alert alert-danger mt-1">{{ form.serial_number.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Описание -->
+                        <div class="form-group mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
+                                {{ form.description.label }}
+                            </label>
+                            {{ form.description }}
+                            {% if form.description.help_text %}
+                                <div class="form-text text-muted small">{{ form.description.help_text }}</div>
+                            {% endif %}
+                            {% if form.description.errors %}
+                                <div class="alert alert-danger mt-1">{{ form.description.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Группа 1 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 1</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.title1.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title1.label }}
+                                            </label>
+                                            {{ form.title1 }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.image1.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image1.label }}
+                                            </label>
+                                            
+                                            {% if object and object.image1 %}
+                                                <div class="current-image-wrapper mb-2">
+                                                    <img src="{{ object.image1.url }}" alt="Текущее изображение" 
+                                                         class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 3px solid #28a745;">
+                                                    <div style="margin-top: 5px;">
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check-circle"></i> Есть фото
+                                                        </span>
+                                                        <small class="text-muted d-block">Текущее изображение</small>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Чекбокс для удаления -->
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="delete_image1" id="delete_image1">
+                                                    <label class="form-check-label text-danger" for="delete_image1">
+                                                        <i class="fas fa-trash"></i> Удалить текущее изображение
+                                                    </label>
+                                                </div>
+                                                
+                                                <!-- Поле для загрузки нового -->
+                                                <div class="mt-2">
+                                                    <label class="fw-bold">Или загрузить новое:</label>
+                                                    {{ form.image1 }}
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-state mb-2">
+                                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                                    <p class="text-muted mt-1">Нет изображения</p>
+                                                </div>
+                                                {{ form.image1 }}
+                                            {% endif %}
+                                            
+                                            {% if form.image1.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image1.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image1.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image1.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 2 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 2</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.title2.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title2.label }}
+                                            </label>
+                                            {{ form.title2 }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.image2.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image2.label }}
+                                            </label>
+                                            
+                                            {% if object and object.image2 %}
+                                                <div class="current-image-wrapper mb-2">
+                                                    <img src="{{ object.image2.url }}" alt="Текущее изображение" 
+                                                         class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 3px solid #28a745;">
+                                                    <div style="margin-top: 5px;">
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check-circle"></i> Есть фото
+                                                        </span>
+                                                        <small class="text-muted d-block">Текущее изображение</small>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="delete_image2" id="delete_image2">
+                                                    <label class="form-check-label text-danger" for="delete_image2">
+                                                        <i class="fas fa-trash"></i> Удалить текущее изображение
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="mt-2">
+                                                    <label class="fw-bold">Или загрузить новое:</label>
+                                                    {{ form.image2 }}
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-state mb-2">
+                                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                                    <p class="text-muted mt-1">Нет изображения</p>
+                                                </div>
+                                                {{ form.image2 }}
+                                            {% endif %}
+                                            
+                                            {% if form.image2.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image2.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image2.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image2.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 3 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 3</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.title3.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title3.label }}
+                                            </label>
+                                            {{ form.title3 }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.image3.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image3.label }}
+                                            </label>
+                                            
+                                            {% if object and object.image3 %}
+                                                <div class="current-image-wrapper mb-2">
+                                                    <img src="{{ object.image3.url }}" alt="Текущее изображение" 
+                                                         class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 3px solid #28a745;">
+                                                    <div style="margin-top: 5px;">
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check-circle"></i> Есть фото
+                                                        </span>
+                                                        <small class="text-muted d-block">Текущее изображение</small>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="delete_image3" id="delete_image3">
+                                                    <label class="form-check-label text-danger" for="delete_image3">
+                                                        <i class="fas fa-trash"></i> Удалить текущее изображение
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="mt-2">
+                                                    <label class="fw-bold">Или загрузить новое:</label>
+                                                    {{ form.image3 }}
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-state mb-2">
+                                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                                    <p class="text-muted mt-1">Нет изображения</p>
+                                                </div>
+                                                {{ form.image3 }}
+                                            {% endif %}
+                                            
+                                            {% if form.image3.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image3.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image3.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image3.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 4 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 4</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.title4.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title4.label }}
+                                            </label>
+                                            {{ form.title4 }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.image4.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image4.label }}
+                                            </label>
+                                            
+                                            {% if object and object.image4 %}
+                                                <div class="current-image-wrapper mb-2">
+                                                    <img src="{{ object.image4.url }}" alt="Текущее изображение" 
+                                                         class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 3px solid #28a745;">
+                                                    <div style="margin-top: 5px;">
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check-circle"></i> Есть фото
+                                                        </span>
+                                                        <small class="text-muted d-block">Текущее изображение</small>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="delete_image4" id="delete_image4">
+                                                    <label class="form-check-label text-danger" for="delete_image4">
+                                                        <i class="fas fa-trash"></i> Удалить текущее изображение
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="mt-2">
+                                                    <label class="fw-bold">Или загрузить новое:</label>
+                                                    {{ form.image4 }}
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-state mb-2">
+                                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                                    <p class="text-muted mt-1">Нет изображения</p>
+                                                </div>
+                                                {{ form.image4 }}
+                                            {% endif %}
+                                            
+                                            {% if form.image4.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image4.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image4.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image4.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 5 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 5</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.title5.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title5.label }}
+                                            </label>
+                                            {{ form.title5 }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.image5.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image5.label }}
+                                            </label>
+                                            
+                                            {% if object and object.image5 %}
+                                                <div class="current-image-wrapper mb-2">
+                                                    <img src="{{ object.image5.url }}" alt="Текущее изображение" 
+                                                         class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 3px solid #28a745;">
+                                                    <div style="margin-top: 5px;">
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check-circle"></i> Есть фото
+                                                        </span>
+                                                        <small class="text-muted d-block">Текущее изображение</small>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="delete_image5" id="delete_image5">
+                                                    <label class="form-check-label text-danger" for="delete_image5">
+                                                        <i class="fas fa-trash"></i> Удалить текущее изображение
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="mt-2">
+                                                    <label class="fw-bold">Или загрузить новое:</label>
+                                                    {{ form.image5 }}
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-state mb-2">
+                                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                                    <p class="text-muted mt-1">Нет изображения</p>
+                                                </div>
+                                                {{ form.image5 }}
+                                            {% endif %}
+                                            
+                                            {% if form.image5.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image5.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image5.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image5.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 6 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 6</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.title6.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title6.label }}
+                                            </label>
+                                            {{ form.title6 }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.image6.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image6.label }}
+                                            </label>
+                                            
+                                            {% if object and object.image6 %}
+                                                <div class="current-image-wrapper mb-2">
+                                                    <img src="{{ object.image6.url }}" alt="Текущее изображение" 
+                                                         class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 3px solid #28a745;">
+                                                    <div style="margin-top: 5px;">
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check-circle"></i> Есть фото
+                                                        </span>
+                                                        <small class="text-muted d-block">Текущее изображение</small>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="delete_image6" id="delete_image6">
+                                                    <label class="form-check-label text-danger" for="delete_image6">
+                                                        <i class="fas fa-trash"></i> Удалить текущее изображение
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="mt-2">
+                                                    <label class="fw-bold">Или загрузить новое:</label>
+                                                    {{ form.image6 }}
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-state mb-2">
+                                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                                    <p class="text-muted mt-1">Нет изображения</p>
+                                                </div>
+                                                {{ form.image6 }}
+                                            {% endif %}
+                                            
+                                            {% if form.image6.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image6.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image6.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image6.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Группа 7 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Группа 7</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.title7.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.title7.label }}
+                                            </label>
+                                            {{ form.title7 }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="{{ form.image7.id_for_label }}" class="form-label fw-bold">
+                                                {{ form.image7.label }}
+                                            </label>
+                                            
+                                            {% if object and object.image7 %}
+                                                <div class="current-image-wrapper mb-2">
+                                                    <img src="{{ object.image7.url }}" alt="Текущее изображение" 
+                                                         class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 3px solid #28a745;">
+                                                    <div style="margin-top: 5px;">
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check-circle"></i> Есть фото
+                                                        </span>
+                                                        <small class="text-muted d-block">Текущее изображение</small>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" 
+                                                           name="delete_image7" id="delete_image7">
+                                                    <label class="form-check-label text-danger" for="delete_image7">
+                                                        <i class="fas fa-trash"></i> Удалить текущее изображение
+                                                    </label>
+                                                </div>
+                                                
+                                                <div class="mt-2">
+                                                    <label class="fw-bold">Или загрузить новое:</label>
+                                                    {{ form.image7 }}
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-state mb-2">
+                                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                                    <p class="text-muted mt-1">Нет изображения</p>
+                                                </div>
+                                                {{ form.image7 }}
+                                            {% endif %}
+                                            
+                                            {% if form.image7.help_text %}
+                                                <div class="form-text text-muted small">{{ form.image7.help_text }}</div>
+                                            {% endif %}
+                                            {% if form.image7.errors %}
+                                                <div class="alert alert-danger mt-1">{{ form.image7.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <div>
+                                <a href="{% url 'gs14_control_list' %}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Назад
+                                </a>
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save"></i> 
+                                    {% if object %}
+                                        Сохранить изменения
+                                    {% else %}
+                                        Создать объект
+                                    {% endif %}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .empty-state {
+        text-align: center;
+        padding: 20px;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        background: #f8f9fa;
+        margin-bottom: 10px;
+    }
+    .current-image-wrapper {
+        display: inline-block;
+    }
+    .image-container input[type="file"] {
+        padding: 10px;
+        border: 2px dashed #007bff;
+        background: #f0f8ff;
+        border-radius: 8px;
+        width: 100%;
+    }
+    .form-check-label {
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
