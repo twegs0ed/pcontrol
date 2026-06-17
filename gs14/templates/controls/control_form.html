@@ -79,6 +79,7 @@
                                         <div class="form-group">
                                             <label for="{{ form.image1.id_for_label }}" class="form-label fw-bold">
                                                 {{ form.image1.label }}
+                                                <small class="text-muted">(Нажмите для выбора фото или съемки)</small>
                                             </label>
                                             
                                             {% if object and object.image1 %}
@@ -93,7 +94,6 @@
                                                     </div>
                                                 </div>
                                                 
-                                                <!-- Чекбокс для удаления -->
                                                 <div class="form-check mb-2">
                                                     <input class="form-check-input" type="checkbox" 
                                                            name="delete_image1" id="delete_image1">
@@ -102,15 +102,16 @@
                                                     </label>
                                                 </div>
                                                 
-                                                <!-- Поле для загрузки нового -->
                                                 <div class="mt-2">
                                                     <label class="fw-bold">Или загрузить новое:</label>
                                                     {{ form.image1 }}
+                                                    <small class="text-muted d-block">На телефоне откроется камера</small>
                                                 </div>
                                             {% else %}
                                                 <div class="empty-state mb-2">
                                                     <i class="fas fa-image fa-2x text-muted"></i>
                                                     <p class="text-muted mt-1">Нет изображения</p>
+                                                    <p class="text-muted small">Нажмите на кнопку ниже, чтобы выбрать фото или сделать снимок</p>
                                                 </div>
                                                 {{ form.image1 }}
                                             {% endif %}
@@ -146,6 +147,7 @@
                                         <div class="form-group">
                                             <label for="{{ form.image2.id_for_label }}" class="form-label fw-bold">
                                                 {{ form.image2.label }}
+                                                <small class="text-muted">(Нажмите для выбора фото или съемки)</small>
                                             </label>
                                             
                                             {% if object and object.image2 %}
@@ -171,11 +173,13 @@
                                                 <div class="mt-2">
                                                     <label class="fw-bold">Или загрузить новое:</label>
                                                     {{ form.image2 }}
+                                                    <small class="text-muted d-block">На телефоне откроется камера</small>
                                                 </div>
                                             {% else %}
                                                 <div class="empty-state mb-2">
                                                     <i class="fas fa-image fa-2x text-muted"></i>
                                                     <p class="text-muted mt-1">Нет изображения</p>
+                                                    <p class="text-muted small">Нажмите на кнопку ниже, чтобы выбрать фото или сделать снимок</p>
                                                 </div>
                                                 {{ form.image2 }}
                                             {% endif %}
@@ -211,6 +215,7 @@
                                         <div class="form-group">
                                             <label for="{{ form.image3.id_for_label }}" class="form-label fw-bold">
                                                 {{ form.image3.label }}
+                                                <small class="text-muted">(Нажмите для выбора фото или съемки)</small>
                                             </label>
                                             
                                             {% if object and object.image3 %}
@@ -236,11 +241,13 @@
                                                 <div class="mt-2">
                                                     <label class="fw-bold">Или загрузить новое:</label>
                                                     {{ form.image3 }}
+                                                    <small class="text-muted d-block">На телефоне откроется камера</small>
                                                 </div>
                                             {% else %}
                                                 <div class="empty-state mb-2">
                                                     <i class="fas fa-image fa-2x text-muted"></i>
                                                     <p class="text-muted mt-1">Нет изображения</p>
+                                                    <p class="text-muted small">Нажмите на кнопку ниже, чтобы выбрать фото или сделать снимок</p>
                                                 </div>
                                                 {{ form.image3 }}
                                             {% endif %}
@@ -276,6 +283,7 @@
                                         <div class="form-group">
                                             <label for="{{ form.image4.id_for_label }}" class="form-label fw-bold">
                                                 {{ form.image4.label }}
+                                                <small class="text-muted">(Нажмите для выбора фото или съемки)</small>
                                             </label>
                                             
                                             {% if object and object.image4 %}
@@ -301,11 +309,13 @@
                                                 <div class="mt-2">
                                                     <label class="fw-bold">Или загрузить новое:</label>
                                                     {{ form.image4 }}
+                                                    <small class="text-muted d-block">На телефоне откроется камера</small>
                                                 </div>
                                             {% else %}
                                                 <div class="empty-state mb-2">
                                                     <i class="fas fa-image fa-2x text-muted"></i>
                                                     <p class="text-muted mt-1">Нет изображения</p>
+                                                    <p class="text-muted small">Нажмите на кнопку ниже, чтобы выбрать фото или сделать снимок</p>
                                                 </div>
                                                 {{ form.image4 }}
                                             {% endif %}
@@ -341,6 +351,7 @@
                                         <div class="form-group">
                                             <label for="{{ form.image5.id_for_label }}" class="form-label fw-bold">
                                                 {{ form.image5.label }}
+                                                <small class="text-muted">(Нажмите для выбора фото или съемки)</small>
                                             </label>
                                             
                                             {% if object and object.image5 %}
@@ -366,11 +377,13 @@
                                                 <div class="mt-2">
                                                     <label class="fw-bold">Или загрузить новое:</label>
                                                     {{ form.image5 }}
+                                                    <small class="text-muted d-block">На телефоне откроется камера</small>
                                                 </div>
                                             {% else %}
                                                 <div class="empty-state mb-2">
                                                     <i class="fas fa-image fa-2x text-muted"></i>
                                                     <p class="text-muted mt-1">Нет изображения</p>
+                                                    <p class="text-muted small">Нажмите на кнопку ниже, чтобы выбрать фото или сделать снимок</p>
                                                 </div>
                                                 {{ form.image5 }}
                                             {% endif %}
@@ -406,6 +419,7 @@
                                         <div class="form-group">
                                             <label for="{{ form.image6.id_for_label }}" class="form-label fw-bold">
                                                 {{ form.image6.label }}
+                                                <small class="text-muted">(Нажмите для выбора фото или съемки)</small>
                                             </label>
                                             
                                             {% if object and object.image6 %}
@@ -431,11 +445,13 @@
                                                 <div class="mt-2">
                                                     <label class="fw-bold">Или загрузить новое:</label>
                                                     {{ form.image6 }}
+                                                    <small class="text-muted d-block">На телефоне откроется камера</small>
                                                 </div>
                                             {% else %}
                                                 <div class="empty-state mb-2">
                                                     <i class="fas fa-image fa-2x text-muted"></i>
                                                     <p class="text-muted mt-1">Нет изображения</p>
+                                                    <p class="text-muted small">Нажмите на кнопку ниже, чтобы выбрать фото или сделать снимок</p>
                                                 </div>
                                                 {{ form.image6 }}
                                             {% endif %}
@@ -471,6 +487,7 @@
                                         <div class="form-group">
                                             <label for="{{ form.image7.id_for_label }}" class="form-label fw-bold">
                                                 {{ form.image7.label }}
+                                                <small class="text-muted">(Нажмите для выбора фото или съемки)</small>
                                             </label>
                                             
                                             {% if object and object.image7 %}
@@ -496,11 +513,13 @@
                                                 <div class="mt-2">
                                                     <label class="fw-bold">Или загрузить новое:</label>
                                                     {{ form.image7 }}
+                                                    <small class="text-muted d-block">На телефоне откроется камера</small>
                                                 </div>
                                             {% else %}
                                                 <div class="empty-state mb-2">
                                                     <i class="fas fa-image fa-2x text-muted"></i>
                                                     <p class="text-muted mt-1">Нет изображения</p>
+                                                    <p class="text-muted small">Нажмите на кнопку ниже, чтобы выбрать фото или сделать снимок</p>
                                                 </div>
                                                 {{ form.image7 }}
                                             {% endif %}
@@ -555,12 +574,28 @@
     .current-image-wrapper {
         display: inline-block;
     }
-    .image-container input[type="file"] {
+    input[type="file"] {
         padding: 10px;
         border: 2px dashed #007bff;
         background: #f0f8ff;
         border-radius: 8px;
         width: 100%;
+        cursor: pointer;
+    }
+    input[type="file"]:hover {
+        background: #e3f2fd;
+        border-color: #0056b3;
+    }
+    input[type="file"]::file-selector-button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        background: #007bff;
+        color: white;
+        cursor: pointer;
+    }
+    input[type="file"]::file-selector-button:hover {
+        background: #0056b3;
     }
     .form-check-label {
         cursor: pointer;
