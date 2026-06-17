@@ -10,7 +10,6 @@ class SerialNumberForm(forms.Form):
             'class': 'form-control',
             'placeholder': 'Введите серийный номер',
             'autofocus': True,
-            'id': 'id_serial_number'
         }),
         help_text='Введите уникальный серийный номер устройства'
     )
@@ -32,29 +31,27 @@ class MainInfoForm(forms.ModelForm):
             'description': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 5,
-                'placeholder': 'Введите описание объекта...',
-                'id': 'id_description'
+                'placeholder': 'Введите описание объекта...'
             }),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Общие атрибуты для всех текстовых полей
-        common_widget = forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Введите заголовок'
-        })
         
-        # Применяем ко всем текстовым полям
+        # Настройка всех текстовых полей
         text_fields = ['title1', 'title2', 'title3', 'title4', 'title5', 'title6', 'title7']
         for field_name in text_fields:
-            self.fields[field_name].widget = common_widget
+            self.fields[field_name].widget.attrs.update({
+                'class': 'form-control',
+                'placeholder': f'Введите заголовок'
+            })
         
-        # Для полей изображений добавляем классы
+        # Настройка всех полей для изображений с поддержкой камеры
         image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7']
         for field_name in image_fields:
-            if field_name in self.fields:
-                self.fields[field_name].widget.attrs.update({
-                    'class': 'form-control',
-                    'accept': 'image/*'
-                })
+            self.fields[field_name].widget.attrs.update({
+                'class': 'form-control',
+                'accept': 'image/*',  # Разрешаем только изображения
+                'capture': 'environment',  # Запускаем камеру
+                'style': 'padding: 10px;'
+            })
