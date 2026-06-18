@@ -3,6 +3,7 @@ from django.contrib import messages
 from django.views.generic import ListView, DetailView, CreateView, UpdateView
 from django.views import View
 from django.urls import reverse_lazy
+from django.http import JsonResponse
 from .forms import ControlForm
 from .models import Control
 import os
@@ -41,6 +42,31 @@ class ControlCreateView(CreateView):
     template_name = 'controls/control_form.html'
     success_url = reverse_lazy('gs14_control_list')
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['is_create'] = True
+        return context
+    
+    def post(self, request, *args, **kwargs):
+        """Проверка существования объекта перед созданием"""
+        serial_number = request.POST.get('serial_number')
+        
+        if serial_number:
+            # Проверяем, существует ли объект с таким серийным номером
+            try:
+                existing_obj = Control.objects.get(serial_number=serial_number)
+                messages.warning(
+                    request, 
+                    f'Объект с серийным номером {serial_number} уже существует. '
+                    f'Вы будете перенаправлены на страницу редактирования.'
+                )
+                return redirect('control_edit', serial_number=serial_number)
+            except Control.DoesNotExist:
+                # Объект не найден, продолжаем создание
+                pass
+        
+        return super().post(request, *args, **kwargs)
+    
     def form_valid(self, form):
         messages.success(self.request, f'Объект с серийным номером {form.instance.serial_number} успешно создан.')
         return super().form_valid(form)
@@ -59,6 +85,11 @@ class ControlUpdateView(UpdateView):
     def get_object(self, queryset=None):
         return get_object_or_404(Control, serial_number=self.kwargs['serial_number'])
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['is_create'] = False
+        return context
+    
     def form_valid(self, form):
         # Получаем объект до сохранения
         obj = form.instance
@@ -70,7 +101,13 @@ class ControlUpdateView(UpdateView):
             if self.request.POST.get(delete_key):
                 # Удаляем изображение
                 if getattr(obj, field):
-                    getattr(obj, field).delete(save=False)
+                    try:
+                        old_path = getattr(obj, field).path
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+                            logger.info(f"Удалено изображение: {old_path}")
+                    except Exception as e:
+                        logger.warning(f"Не удалось удалить изображение: {e}")
                     setattr(obj, field, None)
         
         # Сохраняем объект
@@ -102,6 +139,7 @@ class ControlDeleteView(View):
                         logger.warning(f"Не удалось удалить изображение: {e}")
             
             control.delete()
+            
             messages.success(request, f'Объект с серийным номером {serial} успешно удален.')
             return redirect('gs14_control_list')
             
@@ -113,3 +151,25 @@ class ControlDeleteView(View):
             messages.error(request, f'Ошибка при удалении: {str(e)}')
             logger.error(f"Ошибка удаления объекта {pk}: {e}")
             return redirect('gs14_control_list')
+
+
+class CheckSerialView(View):
+    """Проверка существования серийного номера и перенаправление"""
+    def post(self, request):
+        serial_number = request.POST.get('serial_number', '').strip()
+        
+        if not serial_number:
+            messages.error(request, 'Введите серийный номер')
+            return redirect('control_create')
+        
+        try:
+            # Проверяем существование объекта
+            obj = Control.objects.get(serial_number=serial_number)
+            messages.info(request, f'Объект с серийным номером {serial_number} найден. Переход к редактированию.')
+            return redirect('control_edit', serial_number=serial_number)
+        except Control.DoesNotExist:
+            # Объект не найден, создаем новый
+            messages.success(request, f'Создан новый объект с серийным номером {serial_number}.')
+            # Создаем новый объект
+            obj = Control.objects.create(serial_number=serial_number)
+            return redirect('control_edit', serial_number=serial_number)
