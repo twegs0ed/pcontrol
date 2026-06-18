@@ -9,7 +9,7 @@ class ControlAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at', 'updated_at']
     fieldsets = (
         ('Основная информация', {
-            'fields': ('serial_number', 'description')
+            'fields': ('serial_number', 'serial_photo', 'description')
         }),
         ('Изображения', {
             'fields': (

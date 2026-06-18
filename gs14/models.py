@@ -20,6 +20,15 @@ class Control(models.Model):
         verbose_name='Серийный номер',
         db_index=True
     )
+    
+    # === НОВОЕ ПОЛЕ: Фото серийного номера ===
+    serial_photo = models.ImageField(
+        upload_to=get_upload_path,
+        blank=True,
+        null=True,
+        verbose_name='Фото серийного номера'
+    )
+    
     description = models.TextField(
         blank=True, 
         null=True,

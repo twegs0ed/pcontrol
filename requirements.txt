@@ -3,3 +3,6 @@ django-ckeditor
 Pillow
 django-formtools
 django-webcampicture
+pytesseract
+opencv-python-headless 
+numpy

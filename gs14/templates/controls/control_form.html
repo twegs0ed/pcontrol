@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block title %}
+    {% if is_create %}
+        Создание нового объекта
+    {% else %}
+        Редактирование объекта
+    {% endif %}
+{% endblock title %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
@@ -45,7 +53,7 @@
                                 {% if is_create %}
                                     {{ form.serial_number }}
                                     <button type="submit" name="check_serial" value="1" class="btn btn-primary" 
-                                            formaction="{% url 'check_serial' %}" formmethod="post">
+                                            formaction="{% url 'check_serial' %}" formmethod="post" id="enterBtn">
                                         <i class="fas fa-arrow-right"></i> Ввод
                                     </button>
                                 {% else %}
@@ -57,10 +65,47 @@
                                 {% endif %}
                             </div>
                             
+                            <!-- Показываем фото серийного номера если есть -->
+                            {% if object and object.serial_photo %}
+                                <div class="mt-2">
+                                    <label class="fw-bold">Фото серийного номера:</label>
+                                    <div class="current-image-wrapper">
+                                        <img src="{{ object.serial_photo.url }}" alt="Фото серийного номера" 
+                                             class="img-thumbnail" style="max-width: 200px; max-height: 200px; border: 3px solid #17a2b8;">
+                                        <div style="margin-top: 5px;">
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-camera"></i> Фото серийного номера
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Сканирование -->
                             {% if is_create %}
-                                <small class="text-muted">Введите серийный номер и нажмите "Ввод" для проверки</small>
-                            {% else %}
-                                <small class="text-muted">Серийный номер нельзя изменить при редактировании</small>
+                                <div class="mt-3">
+                                    <label class="fw-bold">Или отсканировать серийный номер:</label>
+                                    <div class="row g-2">
+                                        <div class="col-md-8">
+                                            <input type="file" 
+                                                   id="scanFileInput" 
+                                                   accept="image/*" 
+                                                   capture="environment"
+                                                   class="form-control"
+                                                   style="padding: 10px; border: 2px dashed #28a745; background: #f0fff0;">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button type="button" class="btn btn-success w-100" id="scanSendBtn">
+                                                <i class="fas fa-upload"></i> Отправить
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="scanStatus" class="mt-2" style="display: none;"></div>
+                                    <small class="text-muted d-block mt-1">
+                                        <i class="fas fa-camera"></i> 
+                                        После сканирования номер будет вставлен в поле. Проверьте и нажмите "Ввод"
+                                    </small>
+                                </div>
                             {% endif %}
                             
                             {% if form.serial_number.help_text %}
@@ -88,7 +133,7 @@
                         <!-- Группа 1 -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
-                                <h5 class="mb-0">Группа 1</h5>
+                                <h5 class="mb-0">{{ form.title1.label }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -156,7 +201,7 @@
                         <!-- Группа 2 -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
-                                <h5 class="mb-0">Группа 2</h5>
+                                <h5 class="mb-0">{{ form.title2.label }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -224,7 +269,7 @@
                         <!-- Группа 3 -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
-                                <h5 class="mb-0">Группа 3</h5>
+                                <h5 class="mb-0">{{ form.title3.label }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -292,7 +337,7 @@
                         <!-- Группа 4 -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
-                                <h5 class="mb-0">Группа 4</h5>
+                                <h5 class="mb-0">{{ form.title4.label }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -360,7 +405,7 @@
                         <!-- Группа 5 -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
-                                <h5 class="mb-0">Группа 5</h5>
+                                <h5 class="mb-0">{{ form.title5.label }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -428,7 +473,7 @@
                         <!-- Группа 6 -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
-                                <h5 class="mb-0">Группа 6</h5>
+                                <h5 class="mb-0">{{ form.title6.label }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -496,7 +541,7 @@
                         <!-- Группа 7 -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
-                                <h5 class="mb-0">Группа 7</h5>
+                                <h5 class="mb-0">{{ form.title7.label }}</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
@@ -581,7 +626,7 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock content %}
 
 {% block extra_css %}
 <style>
@@ -619,12 +664,139 @@
     input[type="file"]::file-selector-button:hover {
         background: #0056b3;
     }
+    #scanFileInput {
+        border: 2px dashed #28a745 !important;
+        background: #f0fff0 !important;
+    }
+    #scanFileInput:hover {
+        background: #e0ffe0 !important;
+        border-color: #1e7e34 !important;
+    }
     .form-check-label {
         cursor: pointer;
     }
     .input-group .btn {
-        border-top-left-radius: 0;
-        border-bottom-left-radius: 0;
+        border-radius: 0;
+    }
+    .input-group .btn:last-child {
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+    }
+    #scanStatus .alert {
+        margin-bottom: 0;
+    }
+    .scan-loading {
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
+    }
+    .badge.bg-info {
+        background-color: #17a2b8 !important;
     }
 </style>
-{% endblock %}
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script>
+console.log('=== СКРИПТ ЗАГРУЖЕН ===');
+
+var scanInput = document.getElementById('scanFileInput');
+var scanBtn = document.getElementById('scanSendBtn');
+var scanStatus = document.getElementById('scanStatus');
+var serialInput = document.querySelector('#id_serial_number');
+var enterBtn = document.getElementById('enterBtn');
+
+console.log('scanInput:', scanInput);
+console.log('scanBtn:', scanBtn);
+console.log('enterBtn:', enterBtn);
+
+function scanSend() {
+    console.log('=== КНОПКА ОТПРАВИТЬ НАЖАТА ===');
+    
+    var file = scanInput.files[0];
+    if (!file) {
+        scanStatus.style.display = 'block';
+        scanStatus.innerHTML = '<div class="alert alert-warning">Сначала выберите изображение</div>';
+        return;
+    }
+    
+    console.log('Файл выбран:', file.name, 'размер:', file.size);
+    
+    var formData = new FormData();
+    formData.append('scan_image', file);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    scanStatus.style.display = 'block';
+    scanStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Распознавание серийного номера...</div>';
+    
+    fetch('/gs14/control/scan-serial/', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(response) {
+        console.log('Ответ получен, статус:', response.status);
+        return response.json();
+    })
+    .then(function(data) {
+        console.log('Данные:', data);
+        if (data.success) {
+            scanStatus.innerHTML = '<div class="alert alert-success">Найден серийный номер: <strong>' + data.serial_number + '</strong></div>';
+            serialInput.value = data.serial_number;
+            
+            // Подсвечиваем поле
+            serialInput.style.borderColor = '#28a745';
+            serialInput.style.backgroundColor = '#f0fff0';
+            
+            // Подсвечиваем кнопку "Ввод"
+            if (enterBtn) {
+                enterBtn.style.backgroundColor = '#28a745';
+                enterBtn.style.borderColor = '#28a745';
+                enterBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Ввод ✓';
+            }
+            
+            scanStatus.innerHTML += '<div class="alert alert-info mt-2">Проверьте номер и нажмите кнопку "Ввод"</div>';
+        } else {
+            scanStatus.innerHTML = '<div class="alert alert-warning">' + (data.error || 'Не удалось найти серийный номер') + '</div>';
+        }
+    })
+    .catch(function(error) {
+        console.error('Ошибка:', error);
+        scanStatus.innerHTML = '<div class="alert alert-danger">Ошибка: ' + error.message + '</div>';
+    });
+}
+
+if (scanBtn) {
+    scanBtn.onclick = scanSend;
+    console.log('Обработчик для scanSend привязан');
+}
+
+if (scanInput) {
+    scanInput.onchange = function() {
+        console.log('Файл выбран');
+        if (this.files[0]) {
+            this.style.borderColor = '#17a2b8';
+            this.style.backgroundColor = '#f0f8ff';
+            setTimeout(scanSend, 300);
+        }
+    };
+}
+
+// Сброс подсветки при ручном вводе
+if (serialInput) {
+    serialInput.oninput = function() {
+        this.style.borderColor = '';
+        this.style.backgroundColor = '';
+        if (enterBtn) {
+            enterBtn.style.backgroundColor = '';
+            enterBtn.style.borderColor = '';
+            enterBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Ввод';
+        }
+    };
+}
+
+console.log('=== СКРИПТ ГОТОВ ===');
+</script>
+{% endblock extra_js %}
