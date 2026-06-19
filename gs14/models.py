@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 import os
 from django.utils.text import slugify
 from django.utils import timezone
@@ -21,7 +22,16 @@ class Control(models.Model):
         db_index=True
     )
     
-    # === НОВОЕ ПОЛЕ: Фото серийного номера ===
+    # Владелец модели (контролер, который создал)
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='controls',
+        verbose_name='Владелец',
+        null=True,
+        blank=True
+    )
+    
     serial_photo = models.ImageField(
         upload_to=get_upload_path,
         blank=True,
@@ -139,6 +149,11 @@ class Control(models.Model):
         verbose_name = 'Контроль'
         verbose_name_plural = 'Контроли'
         ordering = ['-created_at']
+        permissions = [
+            ("can_view_all_controls", "Может просматривать все объекты"),
+            ("can_edit_all_controls", "Может редактировать все объекты"),
+            ("can_delete_all_controls", "Может удалять все объекты"),
+        ]
     
     def __str__(self):
         return f"{self.serial_number} - {self.title1 or 'Без названия'}"

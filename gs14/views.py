@@ -1,66 +1,137 @@
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.generic import ListView, DetailView, CreateView, UpdateView
 from django.views import View
 from django.urls import reverse_lazy
-from django.http import JsonResponse
-from django.core.files.storage import default_storage
+from django.http import JsonResponse, HttpResponseForbidden
 from django.core.files.base import ContentFile
+from django.conf import settings
+from django.db import models
 from .forms import ControlForm
 from .models import Control
-import os
+import os, sys
 import logging
 import re
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance
 import pytesseract
 import tempfile
 import time
-import cv2
-import numpy as np
-from django.conf import settings
-
-
-if os.name == 'nt':  # Windows
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-else:  # Linux/Mac
-    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 logger = logging.getLogger(__name__)
 
-class ControlListView(ListView):
+# Указываем путь к Tesseract
+if sys.platform == 'win32':  # Windows
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+elif sys.platform == 'linux':  # Linux
+    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+elif sys.platform == 'darwin':  # macOS
+    pytesseract.pytesseract.tesseract_cmd = '/usr/local/bin/tesseract'
+# === ДЕКОРАТОРЫ ДЛЯ ПРОВЕРКИ ПРАВ ===
+
+def controller_required(view_func):
+    """Декоратор для проверки, что пользователь в группе Контролер"""
+    def wrapped(request, *args, **kwargs):
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        if not request.user.groups.filter(name='Контролер').exists():
+            messages.error(request, 'У вас нет прав для выполнения этого действия')
+            return redirect('gs14_control_list')
+        return view_func(request, *args, **kwargs)
+    return wrapped
+
+def auditor_required(view_func):
+    """Декоратор для проверки, что пользователь в группе Аудитор"""
+    def wrapped(request, *args, **kwargs):
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        if not request.user.groups.filter(name='Аудитор').exists():
+            messages.error(request, 'У вас нет прав для выполнения этого действия')
+            return redirect('gs14_control_list')
+        return view_func(request, *args, **kwargs)
+    return wrapped
+
+
+class ControlListView(LoginRequiredMixin, ListView):
+    """Список объектов Control с учетом прав"""
     model = Control
     template_name = 'controls/control_list.html'
     context_object_name = 'controls'
     ordering = ['-created_at']
     paginate_by = 10
     
+    def get_queryset(self):
+        qs = super().get_queryset()
+        
+        # Суперпользователь видит все
+        if self.request.user.is_superuser:
+            return qs
+        
+        # Аудитор видит все
+        if self.request.user.groups.filter(name='Аудитор').exists():
+            return qs
+        
+        # Контролер видит только свои
+        if self.request.user.groups.filter(name='Контролер').exists():
+            return qs.filter(owner=self.request.user)
+        
+        return qs.none()
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Список объектов Control'
-        context['total_count'] = Control.objects.count()
+        context['total_count'] = self.get_queryset().count()
+        context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
+        context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         return context
 
 
-class ControlDetailView(DetailView):
+class ControlDetailView(LoginRequiredMixin, DetailView):
+    """Детальная страница объекта Control"""
     model = Control
     template_name = 'controls/control_detail.html'
     context_object_name = 'control'
     
+    def get_queryset(self):
+        qs = super().get_queryset()
+        
+        if self.request.user.is_superuser:
+            return qs
+        if self.request.user.groups.filter(name='Аудитор').exists():
+            return qs
+        if self.request.user.groups.filter(name='Контролер').exists():
+            return qs.filter(owner=self.request.user)
+        return qs.none()
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = f'Объект {self.object.serial_number}'
+        context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
+        context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
+        context['can_edit'] = self.request.user.is_superuser or \
+                              (self.request.user.groups.filter(name='Контролер').exists() and 
+                               self.object.owner == self.request.user)
         return context
 
 
-class ControlCreateView(CreateView):
+class ControlCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+    """Создание нового объекта"""
     model = Control
     form_class = ControlForm
     template_name = 'controls/control_form.html'
     success_url = reverse_lazy('gs14_control_list')
     
+    def test_func(self):
+        # Суперпользователь или контролер могут создавать
+        return self.request.user.is_superuser or \
+               self.request.user.groups.filter(name='Контролер').exists()
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['is_create'] = True
+        context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
+        context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         return context
     
     def post(self, request, *args, **kwargs):
@@ -81,6 +152,8 @@ class ControlCreateView(CreateView):
         return super().post(request, *args, **kwargs)
     
     def form_valid(self, form):
+        # Устанавливаем владельца
+        form.instance.owner = self.request.user
         messages.success(self.request, f'Объект с серийным номером {form.instance.serial_number} успешно создан.')
         return super().form_valid(form)
     
@@ -89,11 +162,23 @@ class ControlCreateView(CreateView):
         return super().form_invalid(form)
 
 
-class ControlUpdateView(UpdateView):
+class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    """Редактирование объекта"""
     model = Control
     form_class = ControlForm
     template_name = 'controls/control_form.html'
     success_url = reverse_lazy('gs14_control_list')
+    
+    def test_func(self):
+        obj = self.get_object()
+        # Суперпользователь может все
+        if self.request.user.is_superuser:
+            return True
+        # Контролер может редактировать только свои
+        if self.request.user.groups.filter(name='Контролер').exists():
+            return obj.owner == self.request.user
+        # Аудитор не может редактировать
+        return False
     
     def get_object(self, queryset=None):
         return get_object_or_404(Control, serial_number=self.kwargs['serial_number'])
@@ -101,6 +186,11 @@ class ControlUpdateView(UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['is_create'] = False
+        context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
+        context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
+        context['can_edit'] = self.request.user.is_superuser or \
+                              (self.request.user.groups.filter(name='Контролер').exists() and 
+                               self.object.owner == self.request.user)
         return context
     
     def form_valid(self, form):
@@ -130,7 +220,13 @@ class ControlUpdateView(UpdateView):
         return super().form_invalid(form)
 
 
-class ControlDeleteView(View):
+class ControlDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Удаление объекта"""
+    
+    def test_func(self):
+        # Только суперпользователь может удалять
+        return self.request.user.is_superuser
+    
     def post(self, request, pk):
         try:
             control = get_object_or_404(Control, pk=pk)
@@ -162,7 +258,9 @@ class ControlDeleteView(View):
             return redirect('gs14_control_list')
 
 
-class CheckSerialView(View):
+class CheckSerialView(LoginRequiredMixin, View):
+    """Проверка существования серийного номера"""
+    
     def post(self, request):
         serial_number = request.POST.get('serial_number', '').strip()
         
@@ -172,192 +270,28 @@ class CheckSerialView(View):
         
         try:
             obj = Control.objects.get(serial_number=serial_number)
+            
+            # Проверяем права доступа к объекту
+            if not request.user.is_superuser:
+                if request.user.groups.filter(name='Контролер').exists() and obj.owner != request.user:
+                    messages.error(request, 'У вас нет доступа к этому объекту')
+                    return redirect('gs14_control_list')
+            
             messages.info(request, f'Объект с серийным номером {serial_number} найден. Переход к редактированию.')
             return redirect('control_edit', serial_number=serial_number)
         except Control.DoesNotExist:
+            # Проверяем, может ли пользователь создавать
+            if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
+                messages.error(request, 'У вас нет прав для создания объектов')
+                return redirect('gs14_control_list')
+            
             messages.success(request, f'Создан новый объект с серийным номером {serial_number}.')
-            obj = Control.objects.create(serial_number=serial_number)
+            obj = Control.objects.create(serial_number=serial_number, owner=request.user)
             return redirect('control_edit', serial_number=serial_number)
 
 
-'''class ScanSerialView(View):
+class ScanSerialView(LoginRequiredMixin, View):
     """Сканирование серийного номера с фото"""
-    def post(self, request):
-        try:
-            if 'scan_image' not in request.FILES:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Файл не выбран'
-                }, status=400)
-            
-            file = request.FILES['scan_image']
-            
-            if file.size > 10 * 1024 * 1024:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Файл слишком большой (максимум 10MB)'
-                }, status=400)
-            
-            # Сохраняем временный файл
-            temp_dir = tempfile.gettempdir()
-            temp_path = os.path.join(temp_dir, f'scan_{int(time.time())}.jpg')
-            
-            with open(temp_path, 'wb+') as destination:
-                for chunk in file.chunks():
-                    destination.write(chunk)
-            
-            try:
-                # Открываем изображение
-                image = Image.open(temp_path)
-                
-                # === УЛУЧШЕННАЯ ОБРАБОТКА ИЗОБРАЖЕНИЯ ===
-                
-                # 1. Конвертируем в черно-белое
-                image = image.convert('L')
-                
-                # 2. Увеличиваем контраст
-                enhancer = ImageEnhance.Contrast(image)
-                image = enhancer.enhance(2.5)
-                
-                # 3. Увеличиваем резкость
-                enhancer = ImageEnhance.Sharpness(image)
-                image = enhancer.enhance(2.0)
-                
-                # 4. Увеличиваем яркость
-                enhancer = ImageEnhance.Brightness(image)
-                image = enhancer.enhance(1.3)
-                
-                # 5. Применяем фильтр для улучшения краев
-                image = image.filter(ImageFilter.SHARPEN)
-                image = image.filter(ImageFilter.SHARPEN)
-                
-                # 6. Увеличиваем размер для лучшего распознавания
-                width, height = image.size
-                if width < 1500:
-                    new_size = (width * 3, height * 3)
-                    image = image.resize(new_size, Image.Resampling.LANCZOS)
-                
-                # 7. Применяем пороговую обработку (бинаризация)
-                # Используем адаптивный порог для лучшего разделения цифр
-                img_array = np.array(image)
-                
-                # Применяем адаптивный порог
-                binary = cv2.adaptiveThreshold(
-                    img_array, 
-                    255, 
-                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                    cv2.THRESH_BINARY, 
-                    11, 
-                    2
-                )
-                
-                # Удаляем шум
-                kernel = np.ones((2, 2), np.uint8)
-                binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
-                binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
-                
-                # Сохраняем обработанное изображение для отладки
-                debug_path = os.path.join(temp_dir, f'debug_{int(time.time())}.jpg')
-                cv2.imwrite(debug_path, binary)
-                logger.info(f"Отладочное изображение сохранено: {debug_path}")
-                
-                # Конвертируем обратно в PIL для Tesseract
-                processed_image = Image.fromarray(binary)
-                
-                # === РАСПОЗНАВАНИЕ ===
-                
-                # Вариант 1: Только цифры
-                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
-                text1 = pytesseract.image_to_string(processed_image, lang='eng', config=custom_config)
-                
-                # Вариант 2: Цифры и буквы (для случаев, когда буквы могут быть)
-                custom_config2 = r'--oem 3 --psm 6'
-                text2 = pytesseract.image_to_string(processed_image, lang='rus+eng', config=custom_config2)
-                
-                # Вариант 3: Только цифры, но с другим PSM
-                custom_config3 = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
-                text3 = pytesseract.image_to_string(processed_image, lang='eng', config=custom_config3)
-                
-                # Комбинируем результаты
-                all_text = text1 + " " + text2 + " " + text3
-                
-                # Удаляем все не цифры
-                all_text = re.sub(r'[^0-9]', '', all_text)
-                
-                logger.info(f"Распознанный текст после очистки: {all_text}")
-                
-                # === ПОИСК СЕРИЙНОГО НОМЕРА ===
-                serial_number = None
-                found_numbers = []
-                
-                # Ищем все последовательности цифр длиной 5-10
-                matches = re.findall(r'\d{5,10}', all_text)
-                for match in matches:
-                    found_numbers.append(match)
-                    logger.info(f"Найдена последовательность: {match}")
-                
-                # Сначала ищем ровно 7 цифр
-                for num in found_numbers:
-                    if len(num) == 7:
-                        serial_number = num
-                        logger.info(f"Найден 7-значный номер: {serial_number}")
-                        break
-                
-                # Если 7 не найдено, ищем 6-8
-                if not serial_number:
-                    for num in found_numbers:
-                        if 6 <= len(num) <= 8:
-                            serial_number = num
-                            logger.info(f"Найден {len(num)}-значный номер: {serial_number}")
-                            break
-                
-                # Если ничего не найдено, берем первую последовательность
-                if not serial_number and found_numbers:
-                    serial_number = found_numbers[0]
-                    logger.info(f"Найден первый номер: {serial_number}")
-                
-                # Удаляем временные файлы
-                try:
-                    os.remove(temp_path)
-                    if os.path.exists(debug_path):
-                        os.remove(debug_path)
-                except:
-                    pass
-                
-                if serial_number:
-                    return JsonResponse({
-                        'success': True,
-                        'serial_number': serial_number
-                    })
-                else:
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'Не удалось найти серийный номер. Попробуйте сделать фото с лучшим освещением.'
-                    })
-                    
-            except Exception as e:
-                logger.error(f"Ошибка обработки изображения: {e}")
-                try:
-                    os.remove(temp_path)
-                except:
-                    pass
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Ошибка обработки: {str(e)}'
-                }, status=500)
-                
-        except Exception as e:
-            logger.error(f"Ошибка сканирования: {e}")
-            return JsonResponse({
-                'success': False,
-                'error': f'Ошибка сканирования: {str(e)}'
-            }, status=500)'''
-
-
-
-
-class ScanSerialView(View):
-    """Сканирование серийного номера с фото (самый простой вариант)"""
     
     def post(self, request):
         try:
@@ -375,7 +309,6 @@ class ScanSerialView(View):
                     'error': 'Файл слишком большой (максимум 10MB)'
                 }, status=400)
             
-            # Сохраняем временный файл
             temp_dir = tempfile.gettempdir()
             temp_path = os.path.join(temp_dir, f'scan_{int(time.time())}.jpg')
             
@@ -383,7 +316,6 @@ class ScanSerialView(View):
                 for chunk in file.chunks():
                     destination.write(chunk)
             
-            # Сохраняем фото в медиа
             photo_name = f"serial_{int(time.time())}.jpg"
             full_dir = os.path.join(settings.MEDIA_ROOT, 'controls', 'serial_photos')
             
@@ -394,26 +326,16 @@ class ScanSerialView(View):
             
             import shutil
             shutil.copy2(temp_path, full_path)
-            logger.info(f"Фото сохранено: {full_path}")
             
             try:
-                # Открываем изображение
                 image = Image.open(temp_path)
+                image = image.convert('L')
+                image = image.point(lambda p: 255 if p > 128 else 0)
                 
-                # Простая обработка
-                image = image.convert('L')  # Черно-белое
-                image = image.point(lambda p: 255 if p > 128 else 0)  # Бинаризация
-                
-                # Распознавание через Tesseract
                 config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
                 text = pytesseract.image_to_string(image, lang='eng', config=config)
-                
-                # Удаляем все не цифры
                 text = re.sub(r'[^0-9]', '', text)
                 
-                logger.info(f"Распознанный текст: {text}")
-                
-                # Ищем 7 цифр подряд
                 serial_number = None
                 match = re.search(r'\d{7}', text)
                 if match:
@@ -427,27 +349,47 @@ class ScanSerialView(View):
                         if match:
                             serial_number = match.group(0)
                 
-                # Удаляем временный файл
                 try:
                     os.remove(temp_path)
                 except:
                     pass
                 
                 if serial_number:
-                    # Проверяем существование объекта
                     existing_obj = Control.objects.filter(serial_number=serial_number).first()
                     
                     if existing_obj:
+                        # Проверяем права на объект
+                        if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
+                            if full_path and os.path.exists(full_path):
+                                try:
+                                    os.remove(full_path)
+                                except:
+                                    pass
+                            return JsonResponse({
+                                'success': False,
+                                'error': 'У вас нет прав для работы с этим объектом'
+                            }, status=403)
+                        
                         if full_path and os.path.exists(full_path):
                             with open(full_path, 'rb') as f:
                                 existing_obj.serial_photo.save(photo_name, ContentFile(f.read()), save=True)
-                                logger.info(f"Фото добавлено к объекту {serial_number}")
                     else:
-                        obj = Control.objects.create(serial_number=serial_number)
+                        # Создаем новый объект
+                        if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
+                            if full_path and os.path.exists(full_path):
+                                try:
+                                    os.remove(full_path)
+                                except:
+                                    pass
+                            return JsonResponse({
+                                'success': False,
+                                'error': 'У вас нет прав для создания объектов'
+                            }, status=403)
+                        
+                        obj = Control.objects.create(serial_number=serial_number, owner=request.user)
                         if full_path and os.path.exists(full_path):
                             with open(full_path, 'rb') as f:
                                 obj.serial_photo.save(photo_name, ContentFile(f.read()), save=True)
-                                logger.info(f"Создан новый объект {serial_number}")
                     
                     return JsonResponse({
                         'success': True,
@@ -457,13 +399,12 @@ class ScanSerialView(View):
                     if full_path and os.path.exists(full_path):
                         try:
                             os.remove(full_path)
-                            logger.info(f"Удалено фото без номера")
                         except:
                             pass
                     
                     return JsonResponse({
                         'success': False,
-                        'error': 'Не удалось найти 7 цифр серийного номера. Попробуйте другое фото.'
+                        'error': 'Не удалось найти 7 цифр серийного номера'
                     })
                     
             except Exception as e:

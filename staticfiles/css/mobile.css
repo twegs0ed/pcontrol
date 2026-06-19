@@ -1,0 +1,21 @@
+/* static/css/mobile.css */
+@media (max-width: 768px) {
+    .camera-file-input {
+        padding: 20px;
+        font-size: 16px; /* Предотвращает автоматическое масштабирование на iOS */
+    }
+    
+    .file-input-wrapper input[type="file"] {
+        width: 100%;
+        min-height: 60px;
+    }
+    
+    .card-body {
+        padding: 15px;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        font-size: 16px; /* Удобно для пальцев */
+    }
+}

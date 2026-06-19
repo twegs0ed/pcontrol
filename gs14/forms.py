@@ -5,7 +5,7 @@ class ControlForm(forms.ModelForm):
     class Meta:
         model = Control
         fields = '__all__'
-        exclude = ['created_at', 'updated_at']
+        exclude = ['created_at', 'updated_at', 'owner']  # Скрываем поле owner
         widgets = {
             'serial_number': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -68,7 +68,6 @@ class ControlForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Настройка текстовых полей
         text_fields = ['title1', 'title2', 'title3', 'title4', 'title5', 'title6', 'title7']
         for field_name in text_fields:
             if field_name in self.fields:
@@ -77,8 +76,7 @@ class ControlForm(forms.ModelForm):
                     'placeholder': 'Введите заголовок'
                 })
         
-        # Настройка полей изображений с поддержкой камеры
-        image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7', 'serial_photo']
+        image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7']
         for field_name in image_fields:
             if field_name in self.fields:
                 self.fields[field_name].widget.attrs.update({
@@ -88,7 +86,6 @@ class ControlForm(forms.ModelForm):
                     'style': 'padding: 10px;'
                 })
         
-        # Делаем поля необязательными при редактировании
         if self.instance and self.instance.pk:
             for field in self.fields.values():
                 field.required = False
