@@ -27,6 +27,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', index, name='index'),  # главная страница
     path('gs14/', include('gs14.urls')),
+    path('kt08_9a/', include('kt08_9a.urls')),
     # Авторизация
     path('login/', auth_views.LoginView.as_view(
         template_name='registration/login.html'

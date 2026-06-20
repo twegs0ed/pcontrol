@@ -1,11 +1,12 @@
+<!-- gs14/templates/gs14/gs14_form.html -->
 {% extends "base.html" %}
 {% load static %}
 
 {% block title %}
     {% if is_create %}
-        Создание нового объекта
+        Создание объекта GS14
     {% else %}
-        Редактирование объекта
+        Редактирование объекта GS14
     {% endif %}
 {% endblock title %}
 
@@ -17,9 +18,9 @@
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">
                         {% if is_create %}
-                            <i class="fas fa-plus-circle"></i> Создание нового объекта
+                            <i class="fas fa-plus-circle"></i> Создание объекта GS14
                         {% else %}
-                            <i class="fas fa-edit"></i> Редактирование объекта
+                            <i class="fas fa-edit"></i> Редактирование объекта GS14
                         {% endif %}
                     </h4>
                     {% if is_controller or user.is_superuser %}
@@ -38,7 +39,7 @@
                     {% else %}
                         <div class="alert alert-info alert-dismissible fade show">
                             <i class="fas fa-edit"></i>
-                            Редактирование: <strong>{{ object.serial_number }}</strong>
+                            Редактирование GS14: <strong>{{ object.serial_number }}</strong>
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     {% endif %}
@@ -60,7 +61,6 @@
                             </div>
                         {% endif %}
                         
-                        <!-- Серийный номер -->
                         <!-- Серийный номер -->
                         <div class="form-group mb-3">
                             <label for="{{ form.serial_number.id_for_label }}" class="form-label fw-bold">
@@ -476,7 +476,7 @@
 
 {% block extra_js %}
 <script>
-console.log('=== СКРИПТ ЗАГРУЖЕН ===');
+console.log('=== СКРИПТ GS14 ЗАГРУЖЕН ===');
 
 // Функция предпросмотра изображения
 function previewImage(input, previewId, currentImgId, noImgId) {
@@ -493,7 +493,6 @@ function previewImage(input, previewId, currentImgId, noImgId) {
             }
             preview.style.display = 'block';
             
-            // Скрываем текущее изображение и надпись "Нет изображения"
             if (currentImgId) {
                 var currentImg = document.getElementById(currentImgId);
                 if (currentImg) currentImg.style.display = 'none';
@@ -506,7 +505,6 @@ function previewImage(input, previewId, currentImgId, noImgId) {
         reader.readAsDataURL(file);
     } else {
         preview.style.display = 'none';
-        // Показываем текущее изображение если оно было скрыто
         if (currentImgId) {
             var currentImg = document.getElementById(currentImgId);
             if (currentImg) currentImg.style.display = '';
@@ -518,7 +516,6 @@ function previewImage(input, previewId, currentImgId, noImgId) {
     }
 }
 
-// Назначаем обработчики для всех полей с файлами
 document.addEventListener('DOMContentLoaded', function() {
     // Группа 1
     var image1Input = document.querySelector('#id_image1');
@@ -657,7 +654,6 @@ if (scanInput) {
     };
 }
 
-// Сброс подсветки при ручном вводе
 if (serialInput) {
     serialInput.oninput = function() {
         this.style.borderColor = '';
@@ -670,6 +666,6 @@ if (serialInput) {
     };
 }
 
-console.log('=== СКРИПТ ГОТОВ ===');
+console.log('=== СКРИПТ GS14 ГОТОВ ===');
 </script>
 {% endblock extra_js %}

@@ -28,6 +28,7 @@ elif sys.platform == 'linux':  # Linux
     pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 elif sys.platform == 'darwin':  # macOS
     pytesseract.pytesseract.tesseract_cmd = '/usr/local/bin/tesseract'
+
 # === ДЕКОРАТОРЫ ДЛЯ ПРОВЕРКИ ПРАВ ===
 
 def controller_required(view_func):
@@ -56,7 +57,7 @@ def auditor_required(view_func):
 class ControlListView(LoginRequiredMixin, ListView):
     """Список объектов Control с учетом прав"""
     model = Control
-    template_name = 'controls/control_list.html'
+    template_name = 'gs14/gs14_list.html'
     context_object_name = 'controls'
     ordering = ['-created_at']
     paginate_by = 10
@@ -84,13 +85,15 @@ class ControlListView(LoginRequiredMixin, ListView):
         context['total_count'] = self.get_queryset().count()
         context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
+        context['app_name'] = 'GS14'
+        context['app_icon'] = 'fa-microchip'
         return context
 
 
 class ControlDetailView(LoginRequiredMixin, DetailView):
     """Детальная страница объекта Control"""
     model = Control
-    template_name = 'controls/control_detail.html'
+    template_name = 'gs14/gs14_detail.html'
     context_object_name = 'control'
     
     def get_queryset(self):
@@ -112,6 +115,7 @@ class ControlDetailView(LoginRequiredMixin, DetailView):
         context['can_edit'] = self.request.user.is_superuser or \
                               (self.request.user.groups.filter(name='Контролер').exists() and 
                                self.object.owner == self.request.user)
+        context['app_name'] = 'GS14'
         return context
 
 
@@ -119,7 +123,7 @@ class ControlCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     """Создание нового объекта"""
     model = Control
     form_class = ControlForm
-    template_name = 'controls/control_form.html'
+    template_name = 'gs14/gs14_form.html'
     success_url = reverse_lazy('gs14_control_list')
     
     def test_func(self):
@@ -139,6 +143,7 @@ class ControlCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['is_superuser'] = self.request.user.is_superuser
+        context['app_name'] = 'GS14'
         return context
     
     def post(self, request, *args, **kwargs):
@@ -168,11 +173,12 @@ class ControlCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         messages.error(self.request, 'Ошибка при создании объекта. Проверьте данные.')
         return super().form_invalid(form)
 
+
 class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     """Редактирование объекта"""
     model = Control
     form_class = ControlForm
-    template_name = 'controls/control_form.html'
+    template_name = 'gs14/gs14_form.html'
     success_url = reverse_lazy('gs14_control_list')
     
     def test_func(self):
@@ -187,7 +193,7 @@ class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         """Передаем параметры в форму"""
         kwargs = super().get_form_kwargs()
         kwargs['is_create'] = False
-        kwargs['user'] = self.request.user  # Передаем пользователя
+        kwargs['user'] = self.request.user
         return kwargs
     
     def get_object(self, queryset=None):
@@ -201,7 +207,8 @@ class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context['can_edit'] = self.request.user.is_superuser or \
                               (self.request.user.groups.filter(name='Контролер').exists() and 
                                self.object.owner == self.request.user)
-        context['is_superuser'] = self.request.user.is_superuser  # Добавляем для шаблона
+        context['is_superuser'] = self.request.user.is_superuser
+        context['app_name'] = 'GS14'
         return context
     
     def form_valid(self, form):
