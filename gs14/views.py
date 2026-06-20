@@ -283,7 +283,7 @@ class ControlDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):
 
 
 class CheckSerialView(LoginRequiredMixin, View):
-    """Проверка существования серийного номера"""
+    """Проверка существования серийного номера и создание модели"""
     
     def post(self, request):
         serial_number = request.POST.get('serial_number', '').strip()
@@ -293,6 +293,7 @@ class CheckSerialView(LoginRequiredMixin, View):
             return redirect('control_create')
         
         try:
+            # Проверяем, существует ли объект
             obj = Control.objects.get(serial_number=serial_number)
             
             # Проверяем права доступа к объекту
@@ -303,19 +304,21 @@ class CheckSerialView(LoginRequiredMixin, View):
             
             messages.info(request, f'Объект с серийным номером {serial_number} найден. Переход к редактированию.')
             return redirect('control_edit', serial_number=serial_number)
+            
         except Control.DoesNotExist:
             # Проверяем, может ли пользователь создавать
             if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
                 messages.error(request, 'У вас нет прав для создания объектов')
                 return redirect('gs14_control_list')
             
-            messages.success(request, f'Создан новый объект с серийным номером {serial_number}.')
+            # СОЗДАЕМ НОВЫЙ ОБЪЕКТ ТОЛЬКО ЗДЕСЬ, ПОСЛЕ НАЖАТИЯ КНОПКИ "ВВОД"
             obj = Control.objects.create(serial_number=serial_number, owner=request.user)
+            messages.success(request, f'Создан новый объект с серийным номером {serial_number}.')
             return redirect('control_edit', serial_number=serial_number)
 
 
 class ScanSerialView(LoginRequiredMixin, View):
-    """Сканирование серийного номера с фото"""
+    """Сканирование серийного номера с фото - только подстановка номера в поле"""
     
     def post(self, request):
         try:
@@ -340,8 +343,9 @@ class ScanSerialView(LoginRequiredMixin, View):
                 for chunk in file.chunks():
                     destination.write(chunk)
             
-            photo_name = f"serial_{int(time.time())}.jpg"
-            full_dir = os.path.join(settings.MEDIA_ROOT, 'controls', 'serial_photos')
+            # Сохраняем фото сканирования (опционально)
+            photo_name = f"serial_scan_{int(time.time())}.jpg"
+            full_dir = os.path.join(settings.MEDIA_ROOT, 'controls', 'serial_scans')
             
             if not os.path.exists(full_dir):
                 os.makedirs(full_dir)
@@ -379,53 +383,12 @@ class ScanSerialView(LoginRequiredMixin, View):
                     pass
                 
                 if serial_number:
-                    existing_obj = Control.objects.filter(serial_number=serial_number).first()
-                    
-                    if existing_obj:
-                        # Проверяем права на объект
-                        if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
-                            if full_path and os.path.exists(full_path):
-                                try:
-                                    os.remove(full_path)
-                                except:
-                                    pass
-                            return JsonResponse({
-                                'success': False,
-                                'error': 'У вас нет прав для работы с этим объектом'
-                            }, status=403)
-                        
-                        if full_path and os.path.exists(full_path):
-                            with open(full_path, 'rb') as f:
-                                existing_obj.serial_photo.save(photo_name, ContentFile(f.read()), save=True)
-                    else:
-                        # Создаем новый объект
-                        if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
-                            if full_path and os.path.exists(full_path):
-                                try:
-                                    os.remove(full_path)
-                                except:
-                                    pass
-                            return JsonResponse({
-                                'success': False,
-                                'error': 'У вас нет прав для создания объектов'
-                            }, status=403)
-                        
-                        obj = Control.objects.create(serial_number=serial_number, owner=request.user)
-                        if full_path and os.path.exists(full_path):
-                            with open(full_path, 'rb') as f:
-                                obj.serial_photo.save(photo_name, ContentFile(f.read()), save=True)
-                    
+                    # ТОЛЬКО ВОЗВРАЩАЕМ НОМЕР, НЕ СОЗДАЕМ МОДЕЛЬ
                     return JsonResponse({
                         'success': True,
                         'serial_number': serial_number
                     })
                 else:
-                    if full_path and os.path.exists(full_path):
-                        try:
-                            os.remove(full_path)
-                        except:
-                            pass
-                    
                     return JsonResponse({
                         'success': False,
                         'error': 'Не удалось найти 7 цифр серийного номера'
@@ -437,11 +400,6 @@ class ScanSerialView(LoginRequiredMixin, View):
                     os.remove(temp_path)
                 except:
                     pass
-                if full_path and os.path.exists(full_path):
-                    try:
-                        os.remove(full_path)
-                    except:
-                        pass
                 return JsonResponse({
                     'success': False,
                     'error': f'Ошибка: {str(e)}'

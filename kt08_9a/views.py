@@ -236,6 +236,8 @@ class KT08_9aDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):
 
 
 class KT08_9aCheckSerialView(LoginRequiredMixin, View):
+    """Проверка существования серийного номера и создание модели"""
+    
     def post(self, request):
         serial_number = request.POST.get('serial_number', '').strip()
         if not serial_number:
@@ -243,28 +245,31 @@ class KT08_9aCheckSerialView(LoginRequiredMixin, View):
             return redirect('kt08_9a_create')
         
         try:
+            # Проверяем, существует ли объект
             obj = KT08_9a.objects.get(serial_number=serial_number)
+            
             if not request.user.is_superuser and request.user.groups.filter(name='Контролер').exists() and obj.owner != request.user:
                 messages.error(request, 'У вас нет доступа к этому объекту')
                 return redirect('kt08_9a_list')
-            messages.info(
-                request, 
-                f'Объект KT08_9a с серийным номером {serial_number} найден.'
-            )
+            
+            messages.info(request, f'Объект KT08_9a с серийным номером {serial_number} найден.')
             return redirect('kt08_9a_edit', serial_number=serial_number)
+            
         except KT08_9a.DoesNotExist:
+            # Проверяем, может ли пользователь создавать
             if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
                 messages.error(request, 'У вас нет прав для создания объектов')
                 return redirect('kt08_9a_list')
-            messages.success(
-                request, 
-                f'Создан новый объект KT08_9a с серийным номером {serial_number}.'
-            )
+            
+            # СОЗДАЕМ НОВЫЙ ОБЪЕКТ ТОЛЬКО ЗДЕСЬ, ПОСЛЕ НАЖАТИЯ КНОПКИ "ВВОД"
             obj = KT08_9a.objects.create(serial_number=serial_number, owner=request.user)
+            messages.success(request, f'Создан новый объект KT08_9a с серийным номером {serial_number}.')
             return redirect('kt08_9a_edit', serial_number=serial_number)
 
 
 class KT08_9aScanSerialView(LoginRequiredMixin, View):
+    """Сканирование серийного номера с фото - только подстановка номера в поле"""
+    
     def post(self, request):
         try:
             if 'scan_image' not in request.FILES:
@@ -309,22 +314,7 @@ class KT08_9aScanSerialView(LoginRequiredMixin, View):
                     pass
                 
                 if serial_number:
-                    existing_obj = KT08_9a.objects.filter(serial_number=serial_number).first()
-                    
-                    if existing_obj:
-                        if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
-                            return JsonResponse({
-                                'success': False,
-                                'error': 'У вас нет прав для работы с этим объектом'
-                            }, status=403)
-                    else:
-                        if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
-                            return JsonResponse({
-                                'success': False,
-                                'error': 'У вас нет прав для создания объектов'
-                            }, status=403)
-                        KT08_9a.objects.create(serial_number=serial_number, owner=request.user)
-                    
+                    # ТОЛЬКО ВОЗВРАЩАЕМ НОМЕР, НЕ СОЗДАЕМ МОДЕЛЬ
                     return JsonResponse({'success': True, 'serial_number': serial_number})
                 else:
                     return JsonResponse({'success': False, 'error': 'Не удалось найти серийный номер'})
