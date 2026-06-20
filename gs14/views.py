@@ -123,18 +123,26 @@ class ControlCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     success_url = reverse_lazy('gs14_control_list')
     
     def test_func(self):
-        # Суперпользователь или контролер могут создавать
         return self.request.user.is_superuser or \
                self.request.user.groups.filter(name='Контролер').exists()
+    
+    def get_form_kwargs(self):
+        """Передаем параметры в форму"""
+        kwargs = super().get_form_kwargs()
+        kwargs['is_create'] = True
+        kwargs['user'] = self.request.user
+        return kwargs
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['is_create'] = True
         context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
+        context['is_superuser'] = self.request.user.is_superuser
         return context
     
     def post(self, request, *args, **kwargs):
+        """Проверка существования объекта перед созданием"""
         serial_number = request.POST.get('serial_number')
         
         if serial_number:
@@ -152,7 +160,6 @@ class ControlCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         return super().post(request, *args, **kwargs)
     
     def form_valid(self, form):
-        # Устанавливаем владельца
         form.instance.owner = self.request.user
         messages.success(self.request, f'Объект с серийным номером {form.instance.serial_number} успешно создан.')
         return super().form_valid(form)
@@ -160,7 +167,6 @@ class ControlCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     def form_invalid(self, form):
         messages.error(self.request, 'Ошибка при создании объекта. Проверьте данные.')
         return super().form_invalid(form)
-
 
 class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     """Редактирование объекта"""
@@ -171,14 +177,18 @@ class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     
     def test_func(self):
         obj = self.get_object()
-        # Суперпользователь может все
         if self.request.user.is_superuser:
             return True
-        # Контролер может редактировать только свои
         if self.request.user.groups.filter(name='Контролер').exists():
             return obj.owner == self.request.user
-        # Аудитор не может редактировать
         return False
+    
+    def get_form_kwargs(self):
+        """Передаем параметры в форму"""
+        kwargs = super().get_form_kwargs()
+        kwargs['is_create'] = False
+        kwargs['user'] = self.request.user  # Передаем пользователя
+        return kwargs
     
     def get_object(self, queryset=None):
         return get_object_or_404(Control, serial_number=self.kwargs['serial_number'])
@@ -191,10 +201,17 @@ class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context['can_edit'] = self.request.user.is_superuser or \
                               (self.request.user.groups.filter(name='Контролер').exists() and 
                                self.object.owner == self.request.user)
+        context['is_superuser'] = self.request.user.is_superuser  # Добавляем для шаблона
         return context
     
     def form_valid(self, form):
         obj = form.instance
+        
+        # Если пользователь не суперпользователь, сохраняем старый серийный номер
+        if not self.request.user.is_superuser:
+            # Получаем оригинальный объект из базы
+            original_obj = Control.objects.get(pk=obj.pk)
+            obj.serial_number = original_obj.serial_number
         
         image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7']
         for field in image_fields:

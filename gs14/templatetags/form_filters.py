@@ -1,3 +1,4 @@
+# gs14/templatetags/form_filters.py
 from django import template
 
 register = template.Library()
@@ -8,8 +9,8 @@ def get_field(form, field_name):
     try:
         if form and hasattr(form, 'fields') and field_name in form.fields:
             return form[field_name]
-    except Exception as e:
-        print(f"Ошибка в get_field: {e}")
+    except Exception:
+        pass
     return None
 
 @register.filter
@@ -18,6 +19,14 @@ def get_attr(obj, attr_name):
     try:
         if obj and hasattr(obj, attr_name):
             return getattr(obj, attr_name)
-    except Exception as e:
-        print(f"Ошибка в get_attr: {e}")
+    except Exception:
+        pass
     return None
+
+@register.filter
+def add_str(value, arg):
+    """Сложение строк"""
+    try:
+        return str(value) + str(arg)
+    except Exception:
+        return str(value)
