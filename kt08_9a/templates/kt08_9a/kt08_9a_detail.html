@@ -42,6 +42,14 @@
                             <td>{{ control.owner.get_full_name|default:control.owner.username|default:"—" }}</td>
                         </tr>
                         <tr>
+                            <th>Статус:</th>
+                            <td>
+                                <span class="badge-status {{ control.status }}">
+                                    {{ control.get_status_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
                             <th>Дата создания:</th>
                             <td>{{ control.created_at|date:"d.m.Y H:i:s" }}</td>
                         </tr>
@@ -49,6 +57,12 @@
                             <th>Дата обновления:</th>
                             <td>{{ control.updated_at|date:"d.m.Y H:i:s" }}</td>
                         </tr>
+                        {% if control.completed_at %}
+                        <tr>
+                            <th>Дата завершения:</th>
+                            <td>{{ control.completed_at|date:"d.m.Y H:i:s" }}</td>
+                        </tr>
+                        {% endif %}
                     </table>
                 </div>
                 <div class="col-md-6">
@@ -104,7 +118,7 @@
             <a href="{% url 'kt08_9a_list' %}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Назад к списку
             </a>
-            {% if is_controller and control.owner == user or user.is_superuser %}
+            {% if control.can_edit %}
                 <a href="{% url 'kt08_9a_edit' control.serial_number %}" class="btn btn-warning">
                     <i class="fas fa-edit"></i> Редактировать
                 </a>
@@ -112,4 +126,18 @@
         </div>
     </div>
 </div>
+
+<style>
+    .badge-status {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        display: inline-block;
+    }
+    .badge-status.draft { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    .badge-status.in_progress { background: #cce5ff; color: #004085; border: 1px solid #007bff; }
+    .badge-status.completed { background: #d4edda; color: #155724; border: 1px solid #28a745; }
+    .badge-status.closed { background: #f8d7da; color: #721c24; border: 1px solid #dc3545; }
+</style>
 {% endblock %}

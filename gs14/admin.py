@@ -79,11 +79,25 @@ admin.site.register(User, CustomUserAdmin)
 
 @admin.register(Control)
 class ControlAdmin(admin.ModelAdmin):
-    list_display = ['serial_number', 'owner', 'title1', 'image_thumbnail', 'word_export_button', 'pdf_export_button', 'created_at']
-    list_filter = ['created_at', 'updated_at', 'owner']
+    list_display = ['serial_number', 'owner', 'title1', 'get_status_display', 'image_thumbnail', 'created_at']
+    list_filter = ['created_at', 'updated_at', 'owner', 'status']
     search_fields = ['serial_number', 'title1', 'description']
     readonly_fields = ['created_at', 'updated_at', 'image1_preview', 'image2_preview', 'image3_preview', 
                        'image4_preview', 'image5_preview', 'image6_preview', 'image7_preview', 'serial_photo_preview']
+    
+    def get_status_display(self, obj):
+        colors = {
+            'draft': 'secondary',
+            'in_progress': 'primary',
+            'completed': 'success',
+            'closed': 'danger',
+        }
+        return format_html(
+            '<span class="badge bg-{}">{}</span>',
+            colors.get(obj.status, 'secondary'),
+            obj.get_status_display()
+        )
+    get_status_display.short_description = 'Статус'
     
     class Media:
         js = ('admin/js/image_modal.js',)

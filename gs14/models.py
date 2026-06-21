@@ -144,6 +144,38 @@ class Control(models.Model):
         auto_now=True, 
         verbose_name='Дата обновления'
     )
+
+    # Статус объекта
+    STATUS_CHOICES = [
+        ('draft', 'Черновик'),
+        ('in_progress', 'В процессе'),
+        ('completed', 'Завершен'),
+        ('closed', 'Закрыт'),
+    ]
+    
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft',
+        verbose_name='Статус'
+    )
+    
+    # Дата завершения проверки
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Дата завершения'
+    )
+    
+    # Кто закрыл объект
+    closed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='closed_controls',
+        verbose_name='Закрыл'
+    )
     
     class Meta:
         verbose_name = 'Контроль'
@@ -154,6 +186,50 @@ class Control(models.Model):
             ("can_edit_all_controls", "Может редактировать все объекты"),
             ("can_delete_all_controls", "Может удалять все объекты"),
         ]
+    
+    def is_completed(self):
+        """Проверка, заполнены ли все фото"""
+        image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7']
+        for field in image_fields:
+            if not getattr(self, field):
+                return False
+        return True
+    
+    def check_and_update_status(self):
+        """Проверка и обновление статуса"""
+        if self.is_completed() and self.status != 'closed':
+            self.status = 'completed'
+            self.completed_at = timezone.now()
+            self.save()
+            return True
+        return False
+    
+    def can_edit(self, user=None):
+        """
+        Проверка, может ли пользователь редактировать объект
+        Если user не передан, используем текущего пользователя из request
+        """
+        from django.contrib.auth.models import AnonymousUser
+        
+        # Если пользователь не передан, возвращаем False
+        if user is None or isinstance(user, AnonymousUser):
+            return False
+        
+        # Суперпользователь всегда может редактировать
+        if user.is_superuser:
+            return True
+        
+        # Контролер может редактировать только свои объекты в статусе draft или in_progress
+        if user.groups.filter(name='Контролер').exists():
+            if self.owner != user:
+                return False
+            return self.status in ['draft', 'in_progress']
+        
+        return False
+    
+    def is_editable(self):
+        """Проверка, можно ли редактировать объект (без проверки пользователя)"""
+        return self.status in ['draft', 'in_progress']
     
     def __str__(self):
         return f"{self.serial_number} - {self.title1 or 'Без названия'}"

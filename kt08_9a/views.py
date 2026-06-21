@@ -1,4 +1,3 @@
-# kt08_9a/views.py
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -8,16 +7,17 @@ from django.urls import reverse_lazy
 from django.http import JsonResponse
 from django.core.files.base import ContentFile
 from django.conf import settings
+from django.utils import timezone
 from .forms import KT08_9aForm
 from .models import KT08_9a
 import os
+import sys
 import logging
 import re
 from PIL import Image, ImageEnhance
 import pytesseract
 import tempfile
 import time
-import sys
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ elif sys.platform == 'darwin':
 
 
 class KT08_9aListView(LoginRequiredMixin, ListView):
+    """Список объектов KT08_9a с учетом прав"""
     model = KT08_9a
     template_name = 'kt08_9a/kt08_9a_list.html'
     context_object_name = 'controls'
@@ -39,12 +40,19 @@ class KT08_9aListView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        # Суперпользователь видит все
         if self.request.user.is_superuser:
             return qs
+        
+        # Аудитор видит все
         if self.request.user.groups.filter(name='Аудитор').exists():
             return qs
+        
+        # Контролер видит только свои
         if self.request.user.groups.filter(name='Контролер').exists():
             return qs.filter(owner=self.request.user)
+        
         return qs.none()
     
     def get_context_data(self, **kwargs):
@@ -55,16 +63,24 @@ class KT08_9aListView(LoginRequiredMixin, ListView):
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['app_name'] = 'KT08_9a'
         context['app_icon'] = 'fa-microchip'
+        
+        # Добавляем can_edit для каждого объекта
+        user = self.request.user
+        for control in context['controls']:
+            control.can_edit = control.can_edit(user)
+        
         return context
 
 
 class KT08_9aDetailView(LoginRequiredMixin, DetailView):
+    """Детальная страница объекта KT08_9a"""
     model = KT08_9a
     template_name = 'kt08_9a/kt08_9a_detail.html'
     context_object_name = 'control'
     
     def get_queryset(self):
         qs = super().get_queryset()
+        
         if self.request.user.is_superuser:
             return qs
         if self.request.user.groups.filter(name='Аудитор').exists():
@@ -78,21 +94,19 @@ class KT08_9aDetailView(LoginRequiredMixin, DetailView):
         context['title'] = f'Объект {self.object.serial_number}'
         context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
-        context['can_edit'] = self.request.user.is_superuser or \
-                              (self.request.user.groups.filter(name='Контролер').exists() and 
-                               self.object.owner == self.request.user)
+        context['can_edit'] = self.object.can_edit(self.request.user)
         context['app_name'] = 'KT08_9a'
         return context
 
 
 class KT08_9aCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+    """Создание нового объекта KT08_9a"""
     model = KT08_9a
     form_class = KT08_9aForm
     template_name = 'kt08_9a/kt08_9a_form.html'
     success_url = reverse_lazy('kt08_9a_list')
     
     def test_func(self):
-        """Проверка прав доступа: только контролеры и суперпользователи могут создавать"""
         return self.request.user.is_superuser or \
                self.request.user.groups.filter(name='Контролер').exists()
     
@@ -113,6 +127,7 @@ class KT08_9aCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     
     def post(self, request, *args, **kwargs):
         serial_number = request.POST.get('serial_number')
+        
         if serial_number:
             try:
                 existing_obj = KT08_9a.objects.get(serial_number=serial_number)
@@ -123,6 +138,7 @@ class KT08_9aCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
                 return redirect('kt08_9a_edit', serial_number=serial_number)
             except KT08_9a.DoesNotExist:
                 pass
+        
         return super().post(request, *args, **kwargs)
     
     def form_valid(self, form):
@@ -139,19 +155,46 @@ class KT08_9aCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
 
 
 class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    """Редактирование объекта KT08_9a"""
     model = KT08_9a
     form_class = KT08_9aForm
     template_name = 'kt08_9a/kt08_9a_form.html'
     success_url = reverse_lazy('kt08_9a_list')
     
     def test_func(self):
-        """Проверка прав доступа: только владелец, контролер или суперпользователь"""
         obj = self.get_object()
-        if self.request.user.is_superuser:
-            return True
-        if self.request.user.groups.filter(name='Контролер').exists():
-            return obj.owner == self.request.user
-        return False
+        user = self.request.user
+        
+        if not obj.can_edit(user):
+            if user.groups.filter(name='Контролер').exists():
+                if obj.status == 'draft':
+                    messages.warning(
+                        self.request, 
+                        'Объект в статусе "Черновик". Необходимо заполнить все поля.'
+                    )
+                elif obj.status == 'completed':
+                    messages.warning(
+                        self.request, 
+                        'Объект завершен. Редактирование недоступно.'
+                    )
+                elif obj.status == 'closed':
+                    messages.warning(
+                        self.request, 
+                        'Объект закрыт. Редактирование недоступно.'
+                    )
+                else:
+                    messages.warning(
+                        self.request, 
+                        f'Редактирование недоступно. Статус: {obj.status}'
+                    )
+            else:
+                messages.warning(
+                    self.request, 
+                    'У вас нет прав для редактирования этого объекта.'
+                )
+            return False
+        
+        return True
     
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -169,11 +212,13 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['is_superuser'] = self.request.user.is_superuser
         context['app_name'] = 'KT08_9a'
+        context['can_edit'] = self.object.can_edit(self.request.user)
         return context
     
     def form_valid(self, form):
         obj = form.instance
         
+        # Если пользователь не суперпользователь, сохраняем старый серийный номер
         if not self.request.user.is_superuser:
             original_obj = KT08_9a.objects.get(pk=obj.pk)
             obj.serial_number = original_obj.serial_number
@@ -193,10 +238,26 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
                     setattr(obj, field, None)
         
         obj.save()
-        messages.success(
-            self.request, 
-            f'Объект KT08_9a с серийным номером {obj.serial_number} успешно обновлен.'
-        )
+        
+        # Проверяем статус после сохранения
+        if obj.is_completed() and obj.status != 'closed':
+            obj.status = 'completed'
+            obj.completed_at = timezone.now()
+            obj.save()
+            messages.success(
+                self.request, 
+                f'✅ Все фото загружены! Объект KT08_9a {obj.serial_number} завершен.'
+            )
+        else:
+            # Если не все фото загружены, обновляем статус на "В процессе"
+            if obj.status == 'draft':
+                obj.status = 'in_progress'
+                obj.save()
+            messages.success(
+                self.request, 
+                f'Объект KT08_9a {obj.serial_number} успешно обновлен.'
+            )
+        
         return redirect(self.success_url)
     
     def form_invalid(self, form):
@@ -205,8 +266,9 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
 
 class KT08_9aDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Удаление объекта KT08_9a"""
+    
     def test_func(self):
-        """Удаление доступно только суперпользователю"""
         return self.request.user.is_superuser
     
     def post(self, request, pk):
@@ -221,38 +283,51 @@ class KT08_9aDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):
                         old_path = getattr(obj, field).path
                         if os.path.exists(old_path):
                             os.remove(old_path)
-                    except:
-                        pass
+                            logger.info(f"Удалено изображение: {old_path}")
+                    except Exception as e:
+                        logger.warning(f"Не удалось удалить изображение: {e}")
             
             obj.delete()
+            
             messages.success(
                 request, 
                 f'Объект KT08_9a с серийным номером {serial} успешно удален.'
             )
             return redirect('kt08_9a_list')
+            
+        except KT08_9a.DoesNotExist:
+            messages.error(request, f'Объект с ID {pk} не найден')
+            return redirect('kt08_9a_list')
+            
         except Exception as e:
             messages.error(request, f'Ошибка при удалении: {str(e)}')
+            logger.error(f"Ошибка удаления объекта {pk}: {e}")
             return redirect('kt08_9a_list')
 
 
 class KT08_9aCheckSerialView(LoginRequiredMixin, View):
-    """Проверка существования серийного номера и создание модели"""
+    """Проверка существования серийного номера KT08_9a"""
     
     def post(self, request):
         serial_number = request.POST.get('serial_number', '').strip()
+        
         if not serial_number:
             messages.error(request, 'Введите серийный номер')
             return redirect('kt08_9a_create')
         
         try:
-            # Проверяем, существует ли объект
             obj = KT08_9a.objects.get(serial_number=serial_number)
             
-            if not request.user.is_superuser and request.user.groups.filter(name='Контролер').exists() and obj.owner != request.user:
-                messages.error(request, 'У вас нет доступа к этому объекту')
-                return redirect('kt08_9a_list')
+            # Проверяем права доступа к объекту
+            if not request.user.is_superuser:
+                if request.user.groups.filter(name='Контролер').exists() and obj.owner != request.user:
+                    messages.error(request, 'У вас нет доступа к этому объекту')
+                    return redirect('kt08_9a_list')
             
-            messages.info(request, f'Объект KT08_9a с серийным номером {serial_number} найден.')
+            messages.info(
+                request, 
+                f'Объект KT08_9a с серийным номером {serial_number} найден. Переход к редактированию.'
+            )
             return redirect('kt08_9a_edit', serial_number=serial_number)
             
         except KT08_9a.DoesNotExist:
@@ -261,23 +336,32 @@ class KT08_9aCheckSerialView(LoginRequiredMixin, View):
                 messages.error(request, 'У вас нет прав для создания объектов')
                 return redirect('kt08_9a_list')
             
-            # СОЗДАЕМ НОВЫЙ ОБЪЕКТ ТОЛЬКО ЗДЕСЬ, ПОСЛЕ НАЖАТИЯ КНОПКИ "ВВОД"
+            messages.success(
+                request, 
+                f'Создан новый объект KT08_9a с серийным номером {serial_number}.'
+            )
             obj = KT08_9a.objects.create(serial_number=serial_number, owner=request.user)
-            messages.success(request, f'Создан новый объект KT08_9a с серийным номером {serial_number}.')
             return redirect('kt08_9a_edit', serial_number=serial_number)
 
 
 class KT08_9aScanSerialView(LoginRequiredMixin, View):
-    """Сканирование серийного номера с фото - только подстановка номера в поле"""
+    """Сканирование серийного номера KT08_9a с фото"""
     
     def post(self, request):
         try:
             if 'scan_image' not in request.FILES:
-                return JsonResponse({'success': False, 'error': 'Файл не выбран'}, status=400)
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Файл не выбран'
+                }, status=400)
             
             file = request.FILES['scan_image']
+            
             if file.size > 10 * 1024 * 1024:
-                return JsonResponse({'success': False, 'error': 'Файл слишком большой'}, status=400)
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Файл слишком большой (максимум 10MB)'
+                }, status=400)
             
             temp_dir = tempfile.gettempdir()
             temp_path = os.path.join(temp_dir, f'scan_{int(time.time())}.jpg')
@@ -285,6 +369,17 @@ class KT08_9aScanSerialView(LoginRequiredMixin, View):
             with open(temp_path, 'wb+') as destination:
                 for chunk in file.chunks():
                     destination.write(chunk)
+            
+            photo_name = f"serial_scan_{int(time.time())}.jpg"
+            full_dir = os.path.join(settings.MEDIA_ROOT, 'kt08_9a', 'serial_scans')
+            
+            if not os.path.exists(full_dir):
+                os.makedirs(full_dir)
+            
+            full_path = os.path.join(full_dir, photo_name)
+            
+            import shutil
+            shutil.copy2(temp_path, full_path)
             
             try:
                 image = Image.open(temp_path)
@@ -314,12 +409,63 @@ class KT08_9aScanSerialView(LoginRequiredMixin, View):
                     pass
                 
                 if serial_number:
-                    # ТОЛЬКО ВОЗВРАЩАЕМ НОМЕР, НЕ СОЗДАЕМ МОДЕЛЬ
-                    return JsonResponse({'success': True, 'serial_number': serial_number})
+                    return JsonResponse({
+                        'success': True,
+                        'serial_number': serial_number
+                    })
                 else:
-                    return JsonResponse({'success': False, 'error': 'Не удалось найти серийный номер'})
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Не удалось найти 7 цифр серийного номера'
+                    })
+                    
             except Exception as e:
                 logger.error(f"Ошибка: {e}")
-                return JsonResponse({'success': False, 'error': str(e)}, status=500)
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Ошибка: {str(e)}'
+                }, status=500)
+                
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            logger.error(f"Ошибка: {e}")
+            return JsonResponse({
+                'success': False,
+                'error': f'Ошибка: {str(e)}'
+            }, status=500)
+
+
+class KT08_9aChangeStatusView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Изменение статуса объекта KT08_9a (только для администратора)"""
+    
+    def test_func(self):
+        return self.request.user.is_superuser
+    
+    def post(self, request, pk):
+        try:
+            obj = get_object_or_404(KT08_9a, pk=pk)
+            new_status = request.POST.get('new_status')
+            
+            if new_status in dict(KT08_9a.STATUS_CHOICES):
+                obj.status = new_status
+                if new_status == 'completed':
+                    obj.completed_at = timezone.now()
+                obj.save()
+                messages.success(
+                    request, 
+                    f'Статус объекта KT08_9a {obj.serial_number} изменен на "{obj.get_status_display()}".'
+                )
+            else:
+                messages.error(request, 'Неверный статус')
+            
+            return redirect('kt08_9a_edit', serial_number=obj.serial_number)
+            
+        except KT08_9a.DoesNotExist:
+            messages.error(request, 'Объект не найден')
+            return redirect('kt08_9a_list')
+        except Exception as e:
+            messages.error(request, f'Ошибка: {str(e)}')
+            return redirect('kt08_9a_list')

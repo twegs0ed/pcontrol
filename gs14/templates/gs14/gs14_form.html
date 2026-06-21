@@ -30,6 +30,83 @@
                     {% endif %}
                 </div>
                 <div class="card-body">
+                    <!-- Статус объекта -->
+                    {% if object %}
+                        <div class="card mb-3">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                                    <div>
+                                        <span class="fw-bold">Статус:</span>
+                                        {% if object.status == 'draft' %}
+                                            <span class="badge-status draft">Черновик</span>
+                                        {% elif object.status == 'in_progress' %}
+                                            <span class="badge-status in_progress">В процессе</span>
+                                        {% elif object.status == 'completed' %}
+                                            <span class="badge-status completed">Завершен</span>
+                                        {% elif object.status == 'closed' %}
+                                            <span class="badge-status closed">Закрыт</span>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        {% if object.status == 'draft' %}
+                                            <span class="text-warning fw-bold">
+                                                <i class="fas fa-pencil-alt"></i> Черновик
+                                                {% if not is_superuser %}
+                                                    <br><small class="text-muted">Доступно для редактирования</small>
+                                                {% endif %}
+                                            </span>
+                                        {% elif object.status == 'in_progress' %}
+                                            <span class="text-primary fw-bold">
+                                                <i class="fas fa-spinner"></i> В процессе
+                                                {% if not is_superuser %}
+                                                    <br><small class="text-muted">Доступно для редактирования</small>
+                                                {% endif %}
+                                            </span>
+                                        {% elif object.status == 'completed' %}
+                                            <span class="text-success fw-bold">
+                                                <i class="fas fa-check-circle"></i> Завершен
+                                                {% if not is_superuser %}
+                                                    <br><small class="text-danger">Редактирование недоступно</small>
+                                                {% endif %}
+                                            </span>
+                                        {% elif object.status == 'closed' %}
+                                            <span class="text-danger fw-bold">
+                                                <i class="fas fa-lock"></i> Закрыт
+                                                <br><small class="text-muted">Редактирование недоступно</small>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <!-- Если объект завершен или закрыт - показываем сообщение -->
+                    {% if object and object.status in 'completed,closed' and not is_superuser %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-lock"></i>
+                            <strong>Редактирование недоступно!</strong>
+                            {% if object.status == 'completed' %}
+                                Объект завершен. Все фото загружены.
+                            {% elif object.status == 'closed' %}
+                                Объект закрыт для редактирования.
+                            {% endif %}
+                            {% if object.completed_at %}
+                                <br>
+                                <small>Дата завершения: {{ object.completed_at|date:"d.m.Y H:i" }}</small>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Если объект черновик - показываем подсказку -->
+                    {% if object and object.status == 'draft' and not is_superuser %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Черновик!</strong>
+                            Заполните все поля и загрузите все фото для завершения объекта.
+                        </div>
+                    {% endif %}
+
                     {% if is_create %}
                         <div class="alert alert-info alert-dismissible fade show">
                             <i class="fas fa-info-circle"></i>
@@ -43,10 +120,10 @@
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     {% endif %}
-                    
+
                     <form method="post" enctype="multipart/form-data" id="control-form">
                         {% csrf_token %}
-                        
+
                         {% if form.errors %}
                             <div class="alert alert-danger">
                                 <i class="fas fa-exclamation-circle"></i>
@@ -60,66 +137,78 @@
                                 </ul>
                             </div>
                         {% endif %}
-                        
+
                         <!-- Серийный номер -->
-                        <div class="form-group mb-3">
-                            <label for="{{ form.serial_number.id_for_label }}" class="form-label fw-bold">
-                                {{ form.serial_number.label }}
-                                {% if is_create %}<span class="text-danger">*</span>{% endif %}
-                                {% if not is_create and not is_superuser %}
-                                    <span class="badge bg-warning text-dark ms-1">Только для чтения</span>
-                                {% endif %}
-                            </label>
-                            <div class="input-group">
-                                {{ form.serial_number }}
-                                {% if is_create %}
-                                    <button type="submit" name="check_serial" value="1" class="btn btn-primary" 
-                                            formaction="{% url 'check_serial' %}" formmethod="post" id="enterBtn">
-                                        <i class="fas fa-arrow-right"></i> Проверить
-                                    </button>
-                                {% else %}
-                                    <span class="input-group-text bg-light">
-                                        {% if is_superuser %}
-                                            <i class="fas fa-edit text-primary" title="Доступно для редактирования"></i>
-                                        {% else %}
-                                            <i class="fas fa-lock text-muted" title="Только для администратора"></i>
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label for="{{ form.serial_number.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.serial_number.label }}
+                                        {% if is_create %}<span class="text-danger">*</span>{% endif %}
+                                        {% if not is_create and not is_superuser %}
+                                            <span class="badge bg-warning text-dark ms-1">Только для чтения</span>
                                         {% endif %}
-                                    </span>
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.serial_number }}
+                                        {% if is_create %}
+                                            <button type="submit" name="check_serial" value="1" class="btn btn-primary" 
+                                                    formaction="{% url 'check_serial' %}" formmethod="post" id="enterBtn">
+                                                <i class="fas fa-arrow-right"></i> Проверить
+                                            </button>
+                                        {% else %}
+                                            <span class="input-group-text bg-light">
+                                                {% if is_superuser %}
+                                                    <i class="fas fa-edit text-primary" title="Доступно для редактирования"></i>
+                                                {% else %}
+                                                    <i class="fas fa-lock text-muted" title="Только для администратора"></i>
+                                                {% endif %}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    {% if form.serial_number.help_text %}
+                                        <div class="form-text text-muted small">{{ form.serial_number.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.serial_number.errors %}
+                                        <div class="alert alert-danger mt-1">{{ form.serial_number.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <!-- Сканирование -->
+                                {% if is_create %}
+                                    <div class="form-group">
+                                        <label class="form-label fw-bold">Сканировать</label>
+                                        <div class="row g-2">
+                                            <div class="col-8">
+                                                <input type="file" id="scanFileInput" accept="image/*" capture="environment"
+                                                       class="form-control form-control-sm" 
+                                                       style="padding: 8px; border: 2px dashed #28a745; background: #f0fff0;">
+                                            </div>
+                                            <div class="col-4">
+                                                <button type="button" class="btn btn-success w-100 btn-sm" id="scanSendBtn">
+                                                    <i class="fas fa-camera"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="scanStatus" class="mt-2" style="display: none;"></div>
+                                    </div>
                                 {% endif %}
                             </div>
-                            {% if form.serial_number.help_text %}
-                                <div class="form-text text-muted small">{{ form.serial_number.help_text }}</div>
-                            {% endif %}
-                            {% if form.serial_number.errors %}
-                                <div class="alert alert-danger mt-1">{{ form.serial_number.errors }}</div>
-                            {% endif %}
                         </div>
-                        
-                        <!-- Сканирование -->
-                        {% if is_create %}
-                            <div class="row g-2 mb-3 align-items-end">
-                                <div class="col-md-8">
-                                    <input type="file" id="scanFileInput" accept="image/*" capture="environment"
-                                           class="form-control form-control-sm" 
-                                           style="padding: 8px; border: 2px dashed #28a745; background: #f0fff0;">
-                                </div>
-                                <div class="col-md-4">
-                                    <button type="button" class="btn btn-success w-100 btn-sm" id="scanSendBtn">
-                                        <i class="fas fa-camera"></i> Сканировать
-                                    </button>
-                                </div>
-                                <div id="scanStatus" class="mt-2" style="display: none;"></div>
-                            </div>
-                        {% endif %}
-                        
+
                         <!-- Описание -->
-                        <div class="form-group mb-3">
-                            <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
-                                {{ form.description.label }}
-                            </label>
-                            {{ form.description }}
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.description.label }}
+                                    </label>
+                                    {{ form.description }}
+                                </div>
+                            </div>
                         </div>
-                        
+
                         <!-- Группы 1-7 -->
                         <div class="row g-3">
                             <!-- Группа 1 -->
@@ -157,7 +246,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Группа 2 -->
                             <div class="col-md-6">
                                 <div class="card h-100 shadow-sm">
@@ -193,7 +282,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Группа 3 -->
                             <div class="col-md-6">
                                 <div class="card h-100 shadow-sm">
@@ -229,7 +318,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Группа 4 -->
                             <div class="col-md-6">
                                 <div class="card h-100 shadow-sm">
@@ -265,7 +354,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Группа 5 -->
                             <div class="col-md-6">
                                 <div class="card h-100 shadow-sm">
@@ -301,7 +390,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Группа 6 -->
                             <div class="col-md-6">
                                 <div class="card h-100 shadow-sm">
@@ -337,7 +426,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Группа 7 -->
                             <div class="col-md-6">
                                 <div class="card h-100 shadow-sm">
@@ -374,16 +463,22 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Кнопки -->
                         <div class="d-flex justify-content-between mt-4">
                             <a href="{% url 'gs14_control_list' %}" class="btn btn-secondary btn-sm">
                                 <i class="fas fa-arrow-left"></i> Назад
                             </a>
                             {% if not is_create %}
-                                <button type="submit" class="btn btn-success btn-sm">
-                                    <i class="fas fa-save"></i> Сохранить
-                                </button>
+                                {% if can_edit %}
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="fas fa-save"></i> Сохранить 
+                                    </button>
+                                {% else %}
+                                    <button type="button" class="btn btn-secondary btn-sm" disabled>
+                                        <i class="fas fa-lock"></i> Редактирование недоступно
+                                    </button>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </form>
@@ -396,6 +491,18 @@
 
 {% block extra_css %}
 <style>
+    .badge-status {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        display: inline-block;
+    }
+    .badge-status.draft { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    .badge-status.in_progress { background: #cce5ff; color: #004085; border: 1px solid #007bff; }
+    .badge-status.completed { background: #d4edda; color: #155724; border: 1px solid #28a745; }
+    .badge-status.closed { background: #f8d7da; color: #721c24; border: 1px solid #dc3545; }
+    
     .card {
         border-radius: 10px;
         overflow: hidden;

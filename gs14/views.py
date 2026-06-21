@@ -18,6 +18,7 @@ from PIL import Image, ImageEnhance
 import pytesseract
 import tempfile
 import time
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class ControlListView(LoginRequiredMixin, ListView):
     ordering = ['-created_at']
     paginate_by = 10
     
+    
     def get_queryset(self):
         qs = super().get_queryset()
         
@@ -79,6 +81,7 @@ class ControlListView(LoginRequiredMixin, ListView):
         
         return qs.none()
     
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Список объектов Control'
@@ -87,6 +90,8 @@ class ControlListView(LoginRequiredMixin, ListView):
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['app_name'] = 'GS14'
         context['app_icon'] = 'fa-microchip'
+        for control in context['controls']:
+            control.can_edit = control.can_edit(self.request.user)
         return context
 
 
@@ -112,9 +117,7 @@ class ControlDetailView(LoginRequiredMixin, DetailView):
         context['title'] = f'Объект {self.object.serial_number}'
         context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
-        context['can_edit'] = self.request.user.is_superuser or \
-                              (self.request.user.groups.filter(name='Контролер').exists() and 
-                               self.object.owner == self.request.user)
+        context['can_edit'] = self.object.can_edit(self.request.user)
         context['app_name'] = 'GS14'
         return context
 
@@ -175,7 +178,7 @@ class ControlCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
 
 
 class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    """Редактирование объекта"""
+    """Редактирование объекта """
     model = Control
     form_class = ControlForm
     template_name = 'gs14/gs14_form.html'
@@ -183,14 +186,30 @@ class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     
     def test_func(self):
         obj = self.get_object()
-        if self.request.user.is_superuser:
-            return True
-        if self.request.user.groups.filter(name='Контролер').exists():
-            return obj.owner == self.request.user
-        return False
+        user = self.request.user
+        
+        if not obj.can_edit(user):
+            if user.groups.filter(name='Контролер').exists():
+                if obj.status == 'draft':
+                    messages.warning(
+                        self.request, 
+                        'Объект в статусе "Черновик". Необходимо заполнить все поля.'
+                    )
+                elif obj.status == 'completed':
+                    messages.warning(
+                        self.request, 
+                        'Объект завершен. Редактирование недоступно.'
+                    )
+                elif obj.status == 'closed':
+                    messages.warning(
+                        self.request, 
+                        'Объект закрыт. Редактирование недоступно.'
+                    )
+            return False
+        
+        return True
     
     def get_form_kwargs(self):
-        """Передаем параметры в форму"""
         kwargs = super().get_form_kwargs()
         kwargs['is_create'] = False
         kwargs['user'] = self.request.user
@@ -204,11 +223,14 @@ class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context['is_create'] = False
         context['is_controller'] = self.request.user.groups.filter(name='Контролер').exists()
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
-        context['can_edit'] = self.request.user.is_superuser or \
-                              (self.request.user.groups.filter(name='Контролер').exists() and 
-                               self.object.owner == self.request.user)
         context['is_superuser'] = self.request.user.is_superuser
         context['app_name'] = 'GS14'
+        
+        # Добавляем информацию о статусе объекта
+        obj = self.get_object()
+        context['is_completed'] = obj.is_completed()
+        context['is_closed'] = obj.status == 'closed'
+        context['can_edit'] = obj.can_edit(self.request.user)
         return context
     
     def form_valid(self, form):
@@ -216,7 +238,6 @@ class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         
         # Если пользователь не суперпользователь, сохраняем старый серийный номер
         if not self.request.user.is_superuser:
-            # Получаем оригинальный объект из базы
             original_obj = Control.objects.get(pk=obj.pk)
             obj.serial_number = original_obj.serial_number
         
@@ -236,7 +257,25 @@ class ControlUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         
         obj.save()
         
-        messages.success(self.request, f'Объект с серийным номером {obj.serial_number} успешно обновлен.')
+        # Проверяем статус после сохранения
+        if obj.is_completed() and obj.status != 'closed':
+            obj.status = 'completed'
+            obj.completed_at = timezone.now()
+            obj.save()
+            messages.success(
+                self.request, 
+                f'✅ Все фото загружены! Объект {obj.serial_number} завершен. Редактирование закрыто.'
+            )
+        else:
+            # Если не все фото загружены, обновляем статус на "В процессе"
+            if obj.status == 'draft':
+                obj.status = 'in_progress'
+                obj.save()
+            messages.success(
+                self.request, 
+                f'Объект {obj.serial_number} успешно обновлен.'
+            )
+        
         return redirect(self.success_url)
     
     def form_invalid(self, form):
