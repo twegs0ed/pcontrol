@@ -178,8 +178,8 @@ class Control(models.Model):
     )
     
     class Meta:
-        verbose_name = 'Контроль'
-        verbose_name_plural = 'Контроли'
+        verbose_name = 'GS14'
+        verbose_name_plural = 'GS14'
         ordering = ['-created_at']
         permissions = [
             ("can_view_all_controls", "Может просматривать все объекты"),

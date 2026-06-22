@@ -8,6 +8,7 @@ Lib
 bin
 scripts
 pcontrol/settings.py
+media/
 media/controls
 media/controls/serial_photos
 media/images
