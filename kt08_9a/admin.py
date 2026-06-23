@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.utils.html import format_html
 from django.http import HttpResponse
 from django.urls import path
-from .models import KT08_9a
+from .models import KT08_9a  # Правильный импорт
 import io
 import os
 from django.conf import settings
@@ -74,7 +74,7 @@ class KT08_9aAdmin(admin.ModelAdmin):
     list_filter = ['created_at', 'updated_at', 'owner']
     search_fields = ['serial_number', 'title1', 'description']
     readonly_fields = ['created_at', 'updated_at', 'image1_preview', 'image2_preview', 'image3_preview', 
-                       'image4_preview', 'image5_preview', 'image6_preview', 'image7_preview']
+                       'image4_preview', 'image5_preview', 'image6_preview', 'image7_preview', 'serial_photo_preview']
     
     class Media:
         js = ('admin/js/image_modal.js',)
@@ -174,6 +174,40 @@ class KT08_9aAdmin(admin.ModelAdmin):
     def image7_preview(self, obj):
         return self.image_preview(obj, 'image7', 'Вид слева', 'title7')
     image7_preview.short_description = 'Вид слева'
+    
+    # ========== ПРЕВЬЮ ФОТО СЕРИЙНОГО НОМЕРА ==========
+    def serial_photo_preview(self, obj):
+        try:
+            if obj.serial_photo:
+                return format_html(
+                    '''
+                    <div style="margin: 5px 0; padding: 8px; border: 2px solid #17a2b8; border-radius: 6px; background: #f0f8ff;">
+                        <strong style="display: block; margin-bottom: 5px; color: #17a2b8; font-size: 13px;">Фото серийного номера</strong>
+                        <div style="display: inline-block; position: relative;">
+                            <img src="{}" style="max-width: 250px; max-height: 250px; border-radius: 6px; cursor: pointer; border: 3px solid #17a2b8; transition: all 0.3s;"
+                                 onclick="openImageModal('{}', 'Серийный номер: {}')"
+                                 onmouseover="this.style.borderColor='#0d6efd'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.3)';"
+                                 onmouseout="this.style.borderColor='#17a2b8'; this.style.boxShadow='none';"
+                                 title="Нажмите для увеличения" />
+                            <span style="position: absolute; bottom: 5px; right: 5px; background: rgba(23, 162, 184, 0.9); color: white; font-size: 11px; padding: 2px 8px; border-radius: 12px; cursor: pointer;"
+                                  onclick="event.stopPropagation(); openImageModal('{}', 'Серийный номер: {}')">
+                                🔍
+                            </span>
+                        </div>
+                        <br>
+                        <small style="color: #888; font-size: 10px;">Нажмите для увеличения</small>
+                    </div>
+                    ''',
+                    obj.serial_photo.url,
+                    obj.serial_photo.url,
+                    obj.serial_number,
+                    obj.serial_photo.url,
+                    obj.serial_number
+                )
+            return ""
+        except Exception as e:
+            return ""
+    serial_photo_preview.short_description = 'Фото серийного номера'
     
     # ========== ЭКСПОРТ В WORD ==========
     def export_word(self, request, queryset):
@@ -605,7 +639,7 @@ class KT08_9aAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Основная информация', {
-            'fields': ('serial_number', 'owner', 'description')
+            'fields': ('serial_number', 'owner', 'serial_photo', 'serial_photo_preview', 'description')
         }),
         ('Изображения', {
             'fields': (

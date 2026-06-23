@@ -26,6 +26,7 @@ class KT08_9a(models.Model):
         verbose_name='Серийный номер',
         db_index=True
     )
+    serial_photo = models.ImageField(upload_to='serial_photos/', blank=True, null=True, verbose_name="Фото серийного номера")
     
     owner = models.ForeignKey(
         User,
