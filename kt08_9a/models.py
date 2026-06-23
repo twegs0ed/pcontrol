@@ -71,6 +71,11 @@ class KT08_9a(models.Model):
         related_name='closed_kt08_9a',
         verbose_name='Закрыл'
     )
+    is_sample = models.BooleanField(
+        default=False,
+        verbose_name='Образец (только для администратора)',
+        help_text='Отметьте, чтобы сделать эту модель образцом (только одна модель может быть образцом)'
+    )
     
     # === Группа 1: Вид внутри сзади ===
     title1 = models.CharField(

@@ -44,6 +44,11 @@ class Control(models.Model):
         null=True,
         verbose_name='Описание'
     )
+    is_sample = models.BooleanField(
+        default=False,
+        verbose_name='Образец (только для администратора)',
+        help_text='Отметьте, чтобы сделать эту модель образцом (только одна модель может быть образцом)'
+    )
     
     title1 = models.CharField(
         max_length=200, 
