@@ -1,7 +1,7 @@
 <!-- templates/includes/menu.html -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand" href="{% url 'gs14_control_list' %}">
+        <a class="navbar-brand" href="{% url 'gs14:control_list' %}">
             <i class="fas fa-cogs"></i> Управление контролем
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -10,15 +10,12 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
                 {% if user.is_authenticated %}
-                    <!-- Информация о пользователе -->
                     <li class="nav-item">
                         <span class="nav-link">
                             <i class="fas fa-user"></i> {{ user.username }}
                             {% if user.groups.all %}
                                 {% for group in user.groups.all %}
-                                    <span class="badge bg-info ms-1">
-                                        {{ group.name }}
-                                    </span>
+                                    <span class="badge bg-info ms-1">{{ group.name }}</span>
                                 {% endfor %}
                             {% endif %}
                             {% if user.is_superuser %}
@@ -27,7 +24,6 @@
                         </span>
                     </li>
                     
-                    <!-- Выпадающее меню "Изделия" -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="productsDropdown" role="button" 
                            data-bs-toggle="dropdown" aria-expanded="false">
@@ -35,19 +31,18 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="productsDropdown">
                             <li>
-                                <a class="dropdown-item" href="{% url 'gs14_control_list' %}">
-                                    <i class="fas fa-microchip"></i> GS14
+                                <a class="dropdown-item" href="{% url 'gs14:control_list' %}">
+                                    <i class="fas fa-microchip text-primary"></i> GS14
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="{% url 'kt08_9a_list' %}">
-                                    <i class="fas fa-microchip"></i> KT08_9a
+                                <a class="dropdown-item" href="{% url 'kt08_9a:control_list' %}">
+                                    <i class="fas fa-microchip text-success"></i> KT08_9a
                                 </a>
                             </li>
                         </ul>
                     </li>
                     
-                    <!-- Выпадающее меню "Создать" -->
                     {% if user.is_superuser or is_controller %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="createDropdown" role="button" 
@@ -56,20 +51,19 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="createDropdown">
                                 <li>
-                                    <a class="dropdown-item" href="{% url 'control_create' %}">
-                                        <i class="fas fa-microchip"></i> GS14
+                                    <a class="dropdown-item" href="{% url 'gs14:control_create' %}">
+                                        <i class="fas fa-microchip text-primary"></i> GS14
                                     </a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="{% url 'kt08_9a_create' %}">
-                                        <i class="fas fa-microchip"></i> KT08_9a
+                                    <a class="dropdown-item" href="{% url 'kt08_9a:control_create' %}">
+                                        <i class="fas fa-microchip text-success"></i> KT08_9a
                                     </a>
                                 </li>
                             </ul>
                         </li>
                     {% endif %}
                     
-                    <!-- Админка (только для суперпользователя) -->
                     {% if user.is_superuser %}
                         <li class="nav-item">
                             <a class="nav-link" href="/admin/">
@@ -78,7 +72,6 @@
                         </li>
                     {% endif %}
                     
-                    <!-- Выход -->
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'logout' %}">
                             <i class="fas fa-sign-out-alt"></i> Выйти
@@ -86,7 +79,6 @@
                     </li>
                     
                 {% else %}
-                    <!-- Вход -->
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'login' %}">
                             <i class="fas fa-sign-in-alt"></i> Войти

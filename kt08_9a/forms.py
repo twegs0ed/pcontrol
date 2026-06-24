@@ -6,12 +6,17 @@ class KT08_9aForm(forms.ModelForm):
     class Meta:
         model = KT08_9a
         fields = '__all__'
-        exclude = ['created_at', 'updated_at', 'owner', 'serial_photo']
+        exclude = ['created_at', 'updated_at', 'owner']
         widgets = {
             'serial_number': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Введите серийный номер',
                 'autofocus': True,
+            }),
+            'serial_photo': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*',
+                'style': 'padding: 10px;'
             }),
             'description': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -87,7 +92,16 @@ class KT08_9aForm(forms.ModelForm):
                     'style': 'padding: 10px;'
                 })
         
-        # При создании: только serial_number активен
+        # Настройка serial_photo
+        if 'serial_photo' in self.fields:
+            self.fields['serial_photo'].widget.attrs.update({
+                'class': 'form-control',
+                'accept': 'image/*',
+                'capture': 'environment',
+                'style': 'padding: 10px;'
+            })
+        
+        # ПРИ СОЗДАНИИ: только serial_number активен
         if is_create:
             for field_name in self.fields:
                 if field_name != 'serial_number':
@@ -96,7 +110,7 @@ class KT08_9aForm(forms.ModelForm):
                     self.fields[field_name].required = False
                     self.fields[field_name].help_text = 'Будет доступно после создания объекта'
         
-        # При редактировании
+        # ПРИ РЕДАКТИРОВАНИИ: блокируем serial_number для всех кроме суперпользователя
         if self.instance and self.instance.pk and not is_create:
             for field in self.fields.values():
                 field.required = False

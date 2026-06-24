@@ -1,3 +1,4 @@
+# kt08_9a/views.py
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -33,13 +34,27 @@ elif sys.platform == 'darwin':
 class KT08_9aListView(LoginRequiredMixin, ListView):
     """Список объектов KT08_9a с учетом прав"""
     model = KT08_9a
-    template_name = 'kt08_9a/kt08_9a_list.html'
+    template_name = 'common/list.html'  # ИЗМЕНЕНО
     context_object_name = 'controls'
     ordering = ['-created_at']
     paginate_by = 10
     
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        # Фильтр по статусу (ДОБАВЛЕНО)
+        status_filter = self.request.GET.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        
+        # Поиск (ДОБАВЛЕНО)
+        search_query = self.request.GET.get('search')
+        if search_query:
+            qs = qs.filter(
+                models.Q(serial_number__icontains=search_query) |
+                models.Q(title1__icontains=search_query) |
+                models.Q(description__icontains=search_query)
+            )
         
         # Суперпользователь видит все
         if self.request.user.is_superuser:
@@ -63,6 +78,15 @@ class KT08_9aListView(LoginRequiredMixin, ListView):
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['app_name'] = 'KT08_9a'
         context['app_icon'] = 'fa-microchip'
+        context['namespace'] = 'kt08_9a'
+        context['primary_color'] = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'
+        context['header_color'] = 'bg-success'
+        context['app_badge'] = True
+        context['scan_url'] = '/kt08_9a/control/scan-serial/'
+        
+        # Передаем текущие фильтры в контекст (ДОБАВЛЕНО)
+        context['status_filter'] = self.request.GET.get('status', '')
+        context['search_query'] = self.request.GET.get('search', '')
         
         # Добавляем can_edit для каждого объекта
         user = self.request.user
@@ -75,7 +99,7 @@ class KT08_9aListView(LoginRequiredMixin, ListView):
 class KT08_9aDetailView(LoginRequiredMixin, DetailView):
     """Детальная страница объекта KT08_9a"""
     model = KT08_9a
-    template_name = 'kt08_9a/kt08_9a_detail.html'
+    template_name = 'common/detail.html'  # ИЗМЕНЕНО
     context_object_name = 'control'
     
     def get_queryset(self):
@@ -96,6 +120,8 @@ class KT08_9aDetailView(LoginRequiredMixin, DetailView):
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['can_edit'] = self.object.can_edit(self.request.user)
         context['app_name'] = 'KT08_9a'
+        context['namespace'] = 'kt08_9a'  # ДОБАВЛЕНО
+        context['header_color'] = 'bg-success'  # ДОБАВЛЕНО
         return context
 
 
@@ -103,8 +129,8 @@ class KT08_9aCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     """Создание нового объекта KT08_9a"""
     model = KT08_9a
     form_class = KT08_9aForm
-    template_name = 'kt08_9a/kt08_9a_form.html'
-    success_url = reverse_lazy('kt08_9a_list')
+    template_name = 'common/form.html'  # ИЗМЕНЕНО
+    success_url = reverse_lazy('kt08_9a:control_list')
     
     def test_func(self):
         return self.request.user.is_superuser or \
@@ -123,6 +149,9 @@ class KT08_9aCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['is_superuser'] = self.request.user.is_superuser
         context['app_name'] = 'KT08_9a'
+        context['namespace'] = 'kt08_9a'
+        context['header_color'] = 'bg-success'
+        context['scan_url'] = '/kt08_9a/scan-serial/'  # <-- ДОБАВЛЕНО (без /control/)
         return context
     
     def post(self, request, *args, **kwargs):
@@ -135,7 +164,7 @@ class KT08_9aCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
                     request, 
                     f'Объект KT08_9a с серийным номером {serial_number} уже существует.'
                 )
-                return redirect('kt08_9a_edit', serial_number=serial_number)
+                return redirect('kt08_9a:control_edit', serial_number=serial_number)
             except KT08_9a.DoesNotExist:
                 pass
         
@@ -158,8 +187,8 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     """Редактирование объекта KT08_9a"""
     model = KT08_9a
     form_class = KT08_9aForm
-    template_name = 'kt08_9a/kt08_9a_form.html'
-    success_url = reverse_lazy('kt08_9a_list')
+    template_name = 'common/form.html'  # ИЗМЕНЕНО
+    success_url = reverse_lazy('kt08_9a:control_list')
     
     def test_func(self):
         obj = self.get_object()
@@ -212,6 +241,9 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['is_superuser'] = self.request.user.is_superuser
         context['app_name'] = 'KT08_9a'
+        context['namespace'] = 'kt08_9a'
+        context['header_color'] = 'bg-success'
+        context['scan_url'] = '/kt08_9a/scan-serial/'  # <-- ДОБАВЛЕНО (без /control/)
         context['can_edit'] = self.object.can_edit(self.request.user)
         return context
     
@@ -223,6 +255,27 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             original_obj = KT08_9a.objects.get(pk=obj.pk)
             obj.serial_number = original_obj.serial_number
         
+        # Обработка удаления serial_photo
+        if self.request.POST.get('delete_serial_photo'):
+            if obj.serial_photo:
+                try:
+                    old_path = obj.serial_photo.path
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                        logger.info(f"Удалено фото серийного номера: {old_path}")
+                except Exception as e:
+                    logger.warning(f"Не удалось удалить фото серийного номера: {e}")
+                obj.serial_photo = None
+        
+        # Обработка загрузки нового serial_photo
+        # Файл уже сохранен в объекте через form.save()
+        # Но нужно убедиться, что он сохранился
+        if 'serial_photo' in self.request.FILES:
+            # Django автоматически сохранит файл при сохранении объекта
+            # Но мы можем добавить логирование
+            logger.info(f"Загружено новое фото серийного номера для {obj.serial_number}")
+        
+        # Обработка удаления image1-image7
         image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7']
         for field in image_fields:
             delete_key = f'delete_{field}'
@@ -237,6 +290,7 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
                         logger.warning(f"Не удалось удалить изображение: {e}")
                     setattr(obj, field, None)
         
+        # Сохраняем объект
         obj.save()
         
         # Проверяем статус после сохранения
@@ -248,28 +302,33 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
                 self.request, 
                 f'✅ Все фото загружены! Объект KT08_9a {obj.serial_number} завершен.'
             )
+            return redirect('kt08_9a:control_list')  # Переход на список
         else:
-            # Если не все фото загружены, обновляем статус на "В процессе"
             if obj.status == 'draft':
                 obj.status = 'in_progress'
                 obj.save()
             messages.success(
                 self.request, 
-                f'Объект KT08_9a {obj.serial_number} успешно обновлен.'
+                f'📝 Объект KT08_9a {obj.serial_number} успешно обновлен. Продолжите заполнение.'
             )
-        
-        return redirect(self.success_url)
-    
-    def form_invalid(self, form):
-        messages.error(self.request, 'Ошибка при обновлении объекта. Проверьте данные.')
-        return super().form_invalid(form)
+            return redirect('kt08_9a:control_edit', serial_number=obj.serial_number)  # Остаемся на редактировании
 
 
 class KT08_9aDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):
     """Удаление объекта KT08_9a"""
+    template_name = 'common/confirm_delete.html'  # ДОБАВЛЕНО
     
     def test_func(self):
         return self.request.user.is_superuser
+    
+    def get(self, request, pk):
+        obj = get_object_or_404(KT08_9a, pk=pk)
+        context = {
+            'control': obj,
+            'app_name': 'KT08_9a',
+            'namespace': 'kt08_9a',
+        }
+        return render(request, self.template_name, context)
     
     def post(self, request, pk):
         try:
@@ -293,16 +352,60 @@ class KT08_9aDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):
                 request, 
                 f'Объект KT08_9a с серийным номером {serial} успешно удален.'
             )
-            return redirect('kt08_9a_list')
+            return redirect('kt08_9a:control_list')
             
         except KT08_9a.DoesNotExist:
             messages.error(request, f'Объект с ID {pk} не найден')
-            return redirect('kt08_9a_list')
+            return redirect('kt08_9a:control_list')
             
         except Exception as e:
             messages.error(request, f'Ошибка при удалении: {str(e)}')
             logger.error(f"Ошибка удаления объекта {pk}: {e}")
-            return redirect('kt08_9a_list')
+            return redirect('kt08_9a:control_list')
+
+
+class KT08_9aCloseView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Закрытие объекта KT08_9a"""
+    template_name = 'common/confirm_close.html'  # ДОБАВЛЕНО
+    
+    def test_func(self):
+        obj = get_object_or_404(KT08_9a, pk=self.kwargs['pk'])
+        return obj.can_edit(self.request.user)
+    
+    def get(self, request, pk):
+        obj = get_object_or_404(KT08_9a, pk=pk)
+        context = {
+            'control': obj,
+            'app_name': 'KT08_9a',
+            'namespace': 'kt08_9a',
+        }
+        return render(request, self.template_name, context)
+    
+    def post(self, request, pk):
+        try:
+            obj = get_object_or_404(KT08_9a, pk=pk)
+            
+            if not obj.can_edit(request.user):
+                messages.error(request, 'У вас нет прав на закрытие этого объекта')
+                return redirect('kt08_9a:control_detail', pk=obj.pk)
+            
+            if obj.is_completed():
+                obj.status = 'closed'
+                obj.completed_at = timezone.now()
+                obj.closed_by = request.user
+                obj.save()
+                messages.success(request, f'Объект KT08_9a {obj.serial_number} успешно закрыт!')
+            else:
+                messages.error(request, 'Невозможно закрыть объект: не все фото загружены')
+            
+            return redirect('kt08_9a:control_detail', pk=obj.pk)
+            
+        except KT08_9a.DoesNotExist:
+            messages.error(request, f'Объект с ID {pk} не найден')
+            return redirect('kt08_9a:control_list')
+        except Exception as e:
+            messages.error(request, f'Ошибка при закрытии: {str(e)}')
+            return redirect('kt08_9a:control_list')
 
 
 class KT08_9aCheckSerialView(LoginRequiredMixin, View):
@@ -313,7 +416,7 @@ class KT08_9aCheckSerialView(LoginRequiredMixin, View):
         
         if not serial_number:
             messages.error(request, 'Введите серийный номер')
-            return redirect('kt08_9a_create')
+            return redirect('kt08_9a:control_create')
         
         try:
             obj = KT08_9a.objects.get(serial_number=serial_number)
@@ -322,30 +425,31 @@ class KT08_9aCheckSerialView(LoginRequiredMixin, View):
             if not request.user.is_superuser:
                 if request.user.groups.filter(name='Контролер').exists() and obj.owner != request.user:
                     messages.error(request, 'У вас нет доступа к этому объекту')
-                    return redirect('kt08_9a_list')
+                    return redirect('kt08_9a:control_list')
             
             messages.info(
                 request, 
                 f'Объект KT08_9a с серийным номером {serial_number} найден. Переход к редактированию.'
             )
-            return redirect('kt08_9a_edit', serial_number=serial_number)
+            return redirect('kt08_9a:control_edit', serial_number=serial_number)
             
         except KT08_9a.DoesNotExist:
             # Проверяем, может ли пользователь создавать
             if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
                 messages.error(request, 'У вас нет прав для создания объектов')
-                return redirect('kt08_9a_list')
+                return redirect('kt08_9a:control_list')
             
             messages.success(
                 request, 
                 f'Создан новый объект KT08_9a с серийным номером {serial_number}.'
             )
             obj = KT08_9a.objects.create(serial_number=serial_number, owner=request.user)
-            return redirect('kt08_9a_edit', serial_number=serial_number)
+            return redirect('kt08_9a:control_edit', serial_number=serial_number)
 
 
+# kt08_9a/views.py - KT08_9aScanSerialView (исправленная версия)
 class KT08_9aScanSerialView(LoginRequiredMixin, View):
-    """Сканирование серийного номера KT08_9a с фото"""
+    """Сканирование серийного номера KT08_9a с фото с сохранением в модель"""
     
     def post(self, request):
         try:
@@ -363,6 +467,12 @@ class KT08_9aScanSerialView(LoginRequiredMixin, View):
                     'error': 'Файл слишком большой (максимум 10MB)'
                 }, status=400)
             
+            serial_number = request.POST.get('serial_number', '').strip()
+            
+            # Сохраняем файл во временное место
+            import tempfile
+            import os
+            import time
             temp_dir = tempfile.gettempdir()
             temp_path = os.path.join(temp_dir, f'scan_{int(time.time())}.jpg')
             
@@ -370,68 +480,109 @@ class KT08_9aScanSerialView(LoginRequiredMixin, View):
                 for chunk in file.chunks():
                     destination.write(chunk)
             
-            photo_name = f"serial_scan_{int(time.time())}.jpg"
-            full_dir = os.path.join(settings.MEDIA_ROOT, 'kt08_9a', 'serial_scans')
+            file.seek(0)
             
-            if not os.path.exists(full_dir):
-                os.makedirs(full_dir)
+            # Находим или создаем объект
+            obj = None
+            if serial_number:
+                try:
+                    obj = KT08_9a.objects.get(serial_number=serial_number)
+                except KT08_9a.DoesNotExist:
+                    obj = KT08_9a.objects.create(
+                        serial_number=serial_number,
+                        owner=request.user,
+                        status='draft'
+                    )
+            else:
+                import uuid
+                temp_serial = f"TEMP_{uuid.uuid4().hex[:8]}"
+                obj = KT08_9a.objects.create(
+                    serial_number=temp_serial,
+                    owner=request.user,
+                    status='draft'
+                )
             
-            full_path = os.path.join(full_dir, photo_name)
-            
-            import shutil
-            shutil.copy2(temp_path, full_path)
-            
+            # Сохраняем фото
             try:
+                with open(temp_path, 'rb') as f:
+                    from django.core.files import File
+                    obj.serial_photo.save(
+                        f'serial_photo_{obj.serial_number}_{int(time.time())}.jpg',
+                        File(f),
+                        save=True
+                    )
+            except Exception as e:
+                logger.error(f"Ошибка сохранения фото: {e}")
+            
+            # Распознаем
+            detected_serial = None
+            try:
+                import pytesseract
+                from PIL import Image
+                import re
+                import sys
+                
+                if sys.platform == 'win32':
+                    tesseract_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+                    if not os.path.exists(tesseract_path):
+                        tesseract_path = r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe'
+                    if os.path.exists(tesseract_path):
+                        pytesseract.pytesseract.tesseract_cmd = tesseract_path
+                
                 image = Image.open(temp_path)
                 image = image.convert('L')
                 image = image.point(lambda p: 255 if p > 128 else 0)
+                
+                width, height = image.size
+                image = image.resize((width * 2, height * 2), Image.Resampling.LANCZOS)
                 
                 config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
                 text = pytesseract.image_to_string(image, lang='eng', config=config)
                 text = re.sub(r'[^0-9]', '', text)
                 
-                serial_number = None
                 match = re.search(r'\d{7}', text)
                 if match:
-                    serial_number = match.group(0)
+                    detected_serial = match.group(0)
                 else:
                     match = re.search(r'\d{6,8}', text)
                     if match:
-                        serial_number = match.group(0)
+                        detected_serial = match.group(0)
                     else:
                         match = re.search(r'\d{5,}', text)
                         if match:
-                            serial_number = match.group(0)
+                            detected_serial = match.group(0)
                 
-                try:
-                    os.remove(temp_path)
-                except:
-                    pass
-                
-                if serial_number:
-                    return JsonResponse({
-                        'success': True,
-                        'serial_number': serial_number
-                    })
-                else:
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'Не удалось найти 7 цифр серийного номера'
-                    })
-                    
+                if detected_serial and detected_serial != obj.serial_number:
+                    if not KT08_9a.objects.filter(serial_number=detected_serial).exclude(pk=obj.pk).exists():
+                        obj.serial_number = detected_serial
+                        obj.save()
+                        
             except Exception as e:
-                logger.error(f"Ошибка: {e}")
-                try:
-                    os.remove(temp_path)
-                except:
-                    pass
+                logger.error(f"Ошибка распознавания: {e}")
+            
+            # Удаляем временный файл
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+            
+            if detected_serial:
+                return JsonResponse({
+                    'success': True,
+                    'serial_number': detected_serial,
+                    'photo_saved': True,
+                    'message': f'Фото сохранено, номер: {detected_serial}'
+                })
+            else:
                 return JsonResponse({
                     'success': False,
-                    'error': f'Ошибка: {str(e)}'
-                }, status=500)
+                    'serial_number': obj.serial_number,
+                    'photo_saved': True,
+                    'error': 'Фото сохранено, но не удалось распознать серийный номер'
+                })
                 
         except Exception as e:
-            logger.error(f"Ошибка: {e}")
+            logger.error(f"Ошибка: {e}", exc_info=True)
             return JsonResponse({
                 'success': False,
                 'error': f'Ошибка: {str(e)}'
@@ -461,11 +612,11 @@ class KT08_9aChangeStatusView(LoginRequiredMixin, UserPassesTestMixin, View):
             else:
                 messages.error(request, 'Неверный статус')
             
-            return redirect('kt08_9a_edit', serial_number=obj.serial_number)
+            return redirect('kt08_9a:control_edit', serial_number=obj.serial_number)
             
         except KT08_9a.DoesNotExist:
             messages.error(request, 'Объект не найден')
-            return redirect('kt08_9a_list')
+            return redirect('kt08_9a:control_list')
         except Exception as e:
             messages.error(request, f'Ошибка: {str(e)}')
-            return redirect('kt08_9a_list')
+            return redirect('kt08_9a:control_list')

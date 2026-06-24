@@ -9,4 +9,4 @@ def custom_logout(request):
     """Выход из системы"""
     logout(request)
     messages.success(request, 'Вы успешно вышли из системы')
-    return redirect('gs14_control_list')
+    return redirect('gs14:control_list')

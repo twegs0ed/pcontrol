@@ -1,3 +1,4 @@
+# gs14/forms.py
 from django import forms
 from .models import Control
 
@@ -5,19 +6,23 @@ class ControlForm(forms.ModelForm):
     class Meta:
         model = Control
         fields = '__all__'
-        exclude = ['created_at', 'updated_at', 'owner', 'serial_photo']
+        exclude = ['created_at', 'updated_at', 'owner']
         widgets = {
             'serial_number': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Введите серийный номер',
                 'autofocus': True,
             }),
+            'serial_photo': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*',
+                'style': 'padding: 10px;'
+            }),
             'description': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 5,
                 'placeholder': 'Введите описание объекта...'
             }),
-            # Title поля
             'title1': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
             'title2': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
             'title3': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
@@ -25,7 +30,6 @@ class ControlForm(forms.ModelForm):
             'title5': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
             'title6': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
             'title7': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите заголовок'}),
-            # Image поля
             'image1': forms.FileInput(attrs={
                 'class': 'form-control',
                 'accept': 'image/*',
@@ -64,13 +68,11 @@ class ControlForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
-        # Получаем параметр is_create
         is_create = kwargs.pop('is_create', False)
-        # Получаем пользователя для проверки прав
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         
-        # Настройка всех текстовых полей (title1-title7)
+        # Настройка текстовых полей
         text_fields = ['title1', 'title2', 'title3', 'title4', 'title5', 'title6', 'title7']
         for field_name in text_fields:
             if field_name in self.fields:
@@ -79,7 +81,7 @@ class ControlForm(forms.ModelForm):
                     'placeholder': 'Введите заголовок'
                 })
         
-        # Настройка всех полей изображений (image1-image7)
+        # Настройка полей изображений
         image_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7']
         for field_name in image_fields:
             if field_name in self.fields:
@@ -90,27 +92,29 @@ class ControlForm(forms.ModelForm):
                     'style': 'padding: 10px;'
                 })
         
-        # === ПРИ СОЗДАНИИ: все поля кроме serial_number - неактивны ===
+        # Настройка serial_photo
+        if 'serial_photo' in self.fields:
+            self.fields['serial_photo'].widget.attrs.update({
+                'class': 'form-control',
+                'accept': 'image/*',
+                'capture': 'environment',
+                'style': 'padding: 10px;'
+            })
+        
+        # ПРИ СОЗДАНИИ: только serial_number активен
         if is_create:
-            # Список полей, которые должны остаться активными
-            active_fields = ['serial_number']
-            
-            # Делаем все поля неактивными, кроме указанных
             for field_name in self.fields:
-                if field_name not in active_fields:
+                if field_name != 'serial_number':
                     self.fields[field_name].widget.attrs['disabled'] = 'disabled'
                     self.fields[field_name].widget.attrs['class'] = 'form-control disabled-field'
                     self.fields[field_name].required = False
-                    # Добавляем подсказку
                     self.fields[field_name].help_text = 'Будет доступно после создания объекта'
         
-        # === ПРИ РЕДАКТИРОВАНИИ: проверяем права на серийный номер ===
+        # ПРИ РЕДАКТИРОВАНИИ: блокируем serial_number для всех кроме суперпользователя
         if self.instance and self.instance.pk and not is_create:
-            # Делаем все поля активными
             for field in self.fields.values():
                 field.required = False
             
-            # Если пользователь НЕ суперпользователь - блокируем поле serial_number
             if user and not user.is_superuser:
                 self.fields['serial_number'].widget.attrs['readonly'] = True
                 self.fields['serial_number'].widget.attrs['class'] = 'form-control bg-light'

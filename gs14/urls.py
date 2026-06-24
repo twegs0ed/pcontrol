@@ -1,21 +1,31 @@
+# gs14/urls.py
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
-from .views import (
-    ControlListView, ControlDetailView, 
-    ControlCreateView, ControlUpdateView, ControlDeleteView,
-    CheckSerialView, ScanSerialView
-)
+from . import views
+
+app_name = 'gs14'
 
 urlpatterns = [
-    path('control/create/', ControlCreateView.as_view(), name='control_create'),
-    path('control/edit/<str:serial_number>/', ControlUpdateView.as_view(), name='control_edit'),
-    path('control/delete/<int:pk>/', ControlDeleteView.as_view(), name='control_delete'),
-    path('control/check-serial/', CheckSerialView.as_view(), name='check_serial'),
-    path('control/scan-serial/', ScanSerialView.as_view(), name='scan_serial'),
-    path('controls/', ControlListView.as_view(), name='gs14_control_list'),
-    path('control/<int:pk>/', ControlDetailView.as_view(), name='control_detail'),
+    # Список объектов
+    path('', views.ControlListView.as_view(), name='control_list'),
+    
+    # Создание объекта
+    path('create/', views.ControlCreateView.as_view(), name='control_create'),
+    
+    # Сканирование серийного номера (ДОЛЖНО БЫТЬ ДО <int:pk>)
+    path('scan-serial/', views.ScanSerialView.as_view(), name='scan_serial'),
+    
+    # Проверка серийного номера
+    path('check-serial/', views.CheckSerialView.as_view(), name='check_serial'),
+    
+    # Детальный просмотр (через pk) - должно быть ПОСЛЕ всех конкретных путей
+    path('<int:pk>/', views.ControlDetailView.as_view(), name='control_detail'),
+    
+    # Редактирование (через serial_number)
+    path('edit/<str:serial_number>/', views.ControlUpdateView.as_view(), name='control_edit'),
+    
+    # Удаление (через pk)
+    path('delete/<int:pk>/', views.ControlDeleteView.as_view(), name='control_delete'),
+    
+    # Закрытие (через pk)
+    path('close/<int:pk>/', views.ControlCloseView.as_view(), name='control_close'),
 ]
-
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
