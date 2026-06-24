@@ -30,6 +30,9 @@
                     {% endif %}
                 </div>
                 <div class="card-body">
+                    <!-- Контейнер для AJAX сообщений -->
+                    <div id="form-messages"></div>
+                    <!-- Остальной контент -->
                     <!-- Статус объекта -->
                     {% if object %}
                         <div class="card mb-3">
@@ -121,7 +124,9 @@
                         </div>
                     {% endif %}
 
-                    <form method="post" enctype="multipart/form-data" id="control-form">
+                    <form method="post" enctype="multipart/form-data" id="control-form"
+                        data-object-id="{% if object %}{{ object.pk }}{% endif %}"
+                        data-namespace="{{ namespace }}">
                         {% csrf_token %}
 
                         {% if form.errors %}
@@ -856,4 +861,10 @@ if (serialInput) {
 
 console.log('=== СКРИПТ {{ app_name }} ГОТОВ ===');
 </script>
+
+
+
+
+<!-- Подключаем AJAX скрипт -->
+<script src="{% static 'js/ajax_form.js' %}"></script>
 {% endblock extra_js %}

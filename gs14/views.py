@@ -21,6 +21,12 @@ import pytesseract
 import tempfile
 import time
 
+
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+import json
+
+
 logger = logging.getLogger(__name__)
 
 # Указываем путь к Tesseract
@@ -617,3 +623,150 @@ class ScanSerialView(LoginRequiredMixin, View):
                 'success': False,
                 'error': f'Ошибка: {str(e)}'
             }, status=500)
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+@require_http_methods(["POST"])
+def ajax_save_image(request, pk, field_name):
+    """
+    AJAX-сохранение изображения для конкретного поля
+    """
+    try:
+        control = get_object_or_404(Control, pk=pk)
+        
+        # Проверка прав
+        if not control.can_edit(request.user):
+            return JsonResponse({
+                'success': False,
+                'error': 'У вас нет прав на редактирование этого объекта'
+            }, status=403)
+        
+        # Проверка, что поле существует
+        if field_name not in ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7', 'serial_photo']:
+            return JsonResponse({
+                'success': False,
+                'error': f'Поле {field_name} не существует'
+            }, status=400)
+        
+        # Проверка, что файл передан
+        if field_name not in request.FILES:
+            return JsonResponse({
+                'success': False,
+                'error': f'Файл для поля {field_name} не передан'
+            }, status=400)
+        
+        # Сохраняем файл
+        file = request.FILES[field_name]
+        setattr(control, field_name, file)
+        control.save()
+        
+        # Проверяем, завершен ли объект
+        is_completed = control.is_completed()
+        if is_completed and control.status != 'closed':
+            control.status = 'completed'
+            control.completed_at = timezone.now()
+            control.save()
+        
+        # Формируем ответ
+        response_data = {
+            'success': True,
+            'message': f'Изображение для поля {field_name} успешно загружено',
+            'image_url': getattr(control, field_name).url if getattr(control, field_name) else None,
+            'is_completed': is_completed,
+            'status': control.status,
+            'status_display': control.get_status_display()
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении изображения: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_http_methods(["POST"])
+def ajax_save_title(request, pk, field_name):
+    """
+    AJAX-сохранение заголовка для конкретного поля
+    """
+    try:
+        control = get_object_or_404(Control, pk=pk)
+        
+        # Проверка прав
+        if not control.can_edit(request.user):
+            return JsonResponse({
+                'success': False,
+                'error': 'У вас нет прав на редактирование этого объекта'
+            }, status=403)
+        
+        # Проверка, что поле существует
+        if field_name not in ['title1', 'title2', 'title3', 'title4', 'title5', 'title6', 'title7', 'description']:
+            return JsonResponse({
+                'success': False,
+                'error': f'Поле {field_name} не существует'
+            }, status=400)
+        
+        # Получаем значение
+        data = json.loads(request.body)
+        value = data.get('value', '')
+        
+        setattr(control, field_name, value)
+        control.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Заголовок для поля {field_name} сохранен',
+            'value': value
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении заголовка: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_http_methods(["POST"])
+def ajax_check_completed(request, pk):
+    """
+    Проверка, завершен ли объект
+    """
+    try:
+        control = get_object_or_404(Control, pk=pk)
+        
+        is_completed = control.is_completed()
+        
+        if is_completed and control.status != 'closed':
+            control.status = 'completed'
+            control.completed_at = timezone.now()
+            control.save()
+        
+        return JsonResponse({
+            'success': True,
+            'is_completed': is_completed,
+            'status': control.status,
+            'status_display': control.get_status_display(),
+            'message': 'Объект завершен!' if is_completed else 'Не все фото загружены'
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка при проверке завершенности: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
