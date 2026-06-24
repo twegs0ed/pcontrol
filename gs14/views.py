@@ -412,7 +412,7 @@ class ControlCloseView(LoginRequiredMixin, UserPassesTestMixin, View):
 
 
 class CheckSerialView(LoginRequiredMixin, View):
-    """Проверка существования серийного номера и создание модели"""
+    """Проверка и создание объекта с серийным номером"""
     
     def post(self, request):
         serial_number = request.POST.get('serial_number', '').strip()
@@ -440,14 +440,71 @@ class CheckSerialView(LoginRequiredMixin, View):
                 messages.error(request, 'У вас нет прав для создания объектов')
                 return redirect('gs14:control_list')
             
-            # СОЗДАЕМ НОВЫЙ ОБЪЕКТ ТОЛЬКО ЗДЕСЬ, ПОСЛЕ НАЖАТИЯ КНОПКИ "ВВОД"
-            obj = Control.objects.create(serial_number=serial_number, owner=request.user)
-            messages.success(request, f'Создан новый объект с серийным номером {serial_number}.')
+            # СОЗДАЕМ НОВЫЙ ОБЪЕКТ
+            obj = Control.objects.create(
+                serial_number=serial_number,
+                owner=request.user,
+                status='draft'
+            )
+            
+            # СОХРАНЯЕМ ФОТО СЕРИЙНОГО НОМЕРА
+            photo_saved = False
+            
+            # 1. Проверяем скрытое поле с base64 (от сканирования)
+            if 'scanned_photo_base64' in request.POST:
+                import base64
+                from django.core.files.base import ContentFile
+                
+                try:
+                    photo_data = request.POST.get('scanned_photo_base64', '')
+                    print(f"DEBUG: photo_data length: {len(photo_data)}")
+                    
+                    if photo_data and photo_data != 'null' and photo_data != '' and len(photo_data) > 100:
+                        # Проверяем, есть ли префикс data:image
+                        if ';base64,' in photo_data:
+                            format_part, imgstr = photo_data.split(';base64,')
+                            ext = 'jpg'
+                            if '/' in format_part:
+                                ext = format_part.split('/')[-1]
+                                if ext not in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']:
+                                    ext = 'jpg'
+                            
+                            try:
+                                image_data = base64.b64decode(imgstr)
+                                if image_data and len(image_data) > 1000:
+                                    filename = f'serial_photo_{serial_number}.{ext}'
+                                    obj.serial_photo.save(
+                                        filename,
+                                        ContentFile(image_data),
+                                        save=True
+                                    )
+                                    photo_saved = True
+                                    print(f"DEBUG: Photo saved! Size: {len(image_data)} bytes")
+                                    messages.success(request, f'✅ Создан объект с серийным номером {serial_number} и фото из сканирования.')
+                            except Exception as e:
+                                print(f"DEBUG: Base64 decode error: {e}")
+                                logger.error(f"Ошибка декодирования base64: {e}")
+                except Exception as e:
+                    print(f"DEBUG: General error: {e}")
+                    logger.error(f"Ошибка сохранения фото из base64: {e}")
+            
+            # 2. Проверяем, есть ли файл в request.FILES
+            if not photo_saved and 'serial_photo' in request.FILES:
+                try:
+                    obj.serial_photo = request.FILES['serial_photo']
+                    obj.save()
+                    photo_saved = True
+                    messages.success(request, f'✅ Создан объект с серийным номером {serial_number} и фото.')
+                except Exception as e:
+                    logger.error(f"Ошибка сохранения фото: {e}")
+            
+            if not photo_saved:
+                messages.success(request, f'✅ Создан объект с серийным номером {serial_number}.')
+            
             return redirect('gs14:control_edit', serial_number=serial_number)
 
-
 class ScanSerialView(LoginRequiredMixin, View):
-    """Сканирование серийного номера с фото с сохранением в модель"""
+    """Сканирование серийного номера - сохраняет фото в сессию"""
     
     def post(self, request):
         try:
@@ -465,9 +522,6 @@ class ScanSerialView(LoginRequiredMixin, View):
                     'error': 'Файл слишком большой (максимум 10MB)'
                 }, status=400)
             
-            # Получаем серийный номер из запроса
-            serial_number = request.POST.get('serial_number', '').strip()
-            
             # Сохраняем файл во временное место для распознавания
             import tempfile
             import os
@@ -479,114 +533,96 @@ class ScanSerialView(LoginRequiredMixin, View):
                 for chunk in file.chunks():
                     destination.write(chunk)
             
-            # Сбрасываем указатель файла для повторного использования
+            # Сбрасываем указатель файла
             file.seek(0)
             
-            # Пытаемся найти или создать объект
-            control = None
-            is_new = False
-            
-            if serial_number:
-                try:
-                    control = Control.objects.get(serial_number=serial_number)
-                    logger.info(f"Найден объект: {serial_number}")
-                except Control.DoesNotExist:
-                    # Создаем новый объект
-                    control = Control.objects.create(
-                        serial_number=serial_number,
-                        owner=request.user,
-                        status='draft'
-                    )
-                    is_new = True
-                    logger.info(f"Создан новый объект: {serial_number}")
-            else:
-                # Создаем временный объект
-                import uuid
-                temp_serial = f"TEMP_{uuid.uuid4().hex[:8]}"
-                control = Control.objects.create(
-                    serial_number=temp_serial,
-                    owner=request.user,
-                    status='draft'
-                )
-                is_new = True
-                logger.info(f"Создан временный объект: {temp_serial}")
-            
-            # Сохраняем фото в модель
-            try:
-                # Открываем файл заново для сохранения
-                with open(temp_path, 'rb') as f:
-                    from django.core.files import File
-                    control.serial_photo.save(
-                        f'serial_photo_{control.serial_number}_{int(time.time())}.jpg',
-                        File(f),
-                        save=True
-                    )
-                logger.info(f"Фото сохранено для объекта {control.serial_number}")
-            except Exception as e:
-                logger.error(f"Ошибка сохранения фото: {e}")
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Ошибка сохранения фото: {str(e)}',
-                    'serial_number': control.serial_number,
-                    'photo_saved': False
-                }, status=500)
-            
-            # Теперь пытаемся распознать серийный номер
+            # Пытаемся распознать серийный номер
             detected_serial = None
             try:
                 import pytesseract
-                from PIL import Image
+                from PIL import Image, ImageEnhance, ImageFilter
                 import re
                 import sys
                 
                 # Настраиваем Tesseract
                 if sys.platform == 'win32':
-                    tesseract_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-                    if not os.path.exists(tesseract_path):
-                        tesseract_path = r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe'
-                    if os.path.exists(tesseract_path):
-                        pytesseract.pytesseract.tesseract_cmd = tesseract_path
+                    tesseract_paths = [
+                        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+                        r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe'
+                    ]
+                    for path in tesseract_paths:
+                        if os.path.exists(path):
+                            pytesseract.pytesseract.tesseract_cmd = path
+                            break
                 
-                # Открываем изображение для распознавания
+                # Открываем изображение и улучшаем его
                 image = Image.open(temp_path)
+                
+                # Конвертируем в оттенки серого
                 image = image.convert('L')
-                image = image.point(lambda p: 255 if p > 128 else 0)
                 
+                # Увеличиваем контрастность
+                enhancer = ImageEnhance.Contrast(image)
+                image = enhancer.enhance(2.0)
+                
+                # Применяем пороговую обработку (бинаризация)
+                threshold = 128
+                image = image.point(lambda p: 255 if p > threshold else 0)
+                
+                # Увеличиваем размер для лучшего распознавания
                 width, height = image.size
-                image = image.resize((width * 2, height * 2), Image.Resampling.LANCZOS)
+                image = image.resize((width * 3, height * 3), Image.Resampling.LANCZOS)
                 
-                config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789'
-                text = pytesseract.image_to_string(image, lang='eng', config=config)
-                text = re.sub(r'[^0-9]', '', text)
+                # Применяем фильтр для улучшения
+                image = image.filter(ImageFilter.SHARPEN)
                 
-                # Ищем серийный номер
-                match = re.search(r'\d{7}', text)
-                if match:
-                    detected_serial = match.group(0)
-                else:
-                    match = re.search(r'\d{6,8}', text)
-                    if match:
-                        detected_serial = match.group(0)
-                    else:
-                        match = re.search(r'\d{5,}', text)
+                # Пробуем разные конфигурации Tesseract
+                configs = [
+                    r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789',
+                    r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789',
+                    r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789',
+                    r'--oem 3 --psm 13 -c tessedit_char_whitelist=0123456789',
+                ]
+                
+                all_texts = []
+                for config in configs:
+                    try:
+                        text = pytesseract.image_to_string(image, lang='eng', config=config)
+                        text = re.sub(r'[^0-9]', '', text)
+                        if text:
+                            all_texts.append(text)
+                            logger.info(f"Распознано с config {config}: {text}")
+                    except Exception as e:
+                        logger.warning(f"Ошибка с config {config}: {e}")
+                
+                # Ищем серийный номер (7 цифр)
+                patterns = [
+                    r'\d{7}',      # ровно 7 цифр
+                    r'\d{6,8}',    # 6-8 цифр
+                ]
+                
+                for text in all_texts:
+                    for pattern in patterns:
+                        match = re.search(pattern, text)
                         if match:
                             detected_serial = match.group(0)
-                
-                if detected_serial:
-                    logger.info(f"Распознан серийный номер: {detected_serial}")
-                    
-                    # Если это новый объект или номер изменился
-                    if detected_serial != control.serial_number:
-                        # Проверяем, что такой номер не занят
-                        if not Control.objects.filter(serial_number=detected_serial).exclude(pk=control.pk).exists():
-                            control.serial_number = detected_serial
-                            control.save()
-                            logger.info(f"Серийный номер обновлен на {detected_serial}")
-                        else:
-                            logger.warning(f"Номер {detected_serial} уже занят")
-                            
+                            logger.info(f"Найден серийный номер: {detected_serial}")
+                            break
+                    if detected_serial:
+                        break
+                        
             except Exception as e:
                 logger.error(f"Ошибка распознавания: {e}")
+            
+            # Кодируем фото в base64 для отправки в форму
+            import base64
+            photo_base64 = None
+            try:
+                with open(temp_path, 'rb') as f:
+                    photo_base64 = base64.b64encode(f.read()).decode('utf-8')
+                    logger.info(f"Фото закодировано в base64, длина: {len(photo_base64)}")
+            except Exception as e:
+                logger.error(f"Ошибка кодирования фото: {e}")
             
             # Удаляем временный файл
             try:
@@ -594,28 +630,16 @@ class ScanSerialView(LoginRequiredMixin, View):
             except:
                 pass
             
-            # Формируем ответ
-            if detected_serial and detected_serial != control.serial_number:
+            # ===== ПРОВЕРКА НА СУЩЕСТВОВАНИЕ С ОТЛАДКОЙ =====
+            if detected_serial:
                 return JsonResponse({
                     'success': True,
                     'serial_number': detected_serial,
-                    'photo_saved': True,
-                    'message': f'Фото сохранено, номер обновлен на {detected_serial}'
+                    'photo_base64': photo_base64,
+                    'message': f'Распознан номер: {detected_serial}'
+                    # Убираем 'exists'
                 })
-            elif detected_serial:
-                return JsonResponse({
-                    'success': True,
-                    'serial_number': detected_serial,
-                    'photo_saved': True,
-                    'message': f'Фото сохранено, номер {detected_serial}'
-                })
-            else:
-                return JsonResponse({
-                    'success': False,
-                    'serial_number': control.serial_number,
-                    'photo_saved': True,
-                    'error': 'Фото сохранено, но не удалось распознать серийный номер'
-                })
+
                 
         except Exception as e:
             logger.error(f"Общая ошибка: {e}", exc_info=True)
@@ -623,7 +647,6 @@ class ScanSerialView(LoginRequiredMixin, View):
                 'success': False,
                 'error': f'Ошибка: {str(e)}'
             }, status=500)
-        
 
 
 

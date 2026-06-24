@@ -1,3 +1,279 @@
+console.log('=== СКРИПТ GS14 ЗАГРУЖЕН ===');
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DOM загружен ===');
+    
+    // Инициализация предпросмотра для всех изображений
+    for (var i = 1; i <= 7; i++) {
+        var imageInput = document.querySelector('#id_image' + i);
+        if (imageInput) {
+            imageInput.addEventListener('change', function() {
+                var fieldName = this.id.replace('id_', '');
+                previewImage(this, 'preview_' + fieldName, 'current_' + fieldName, 'no_' + fieldName);
+            });
+        }
+    }
+    
+    // Сканирование
+    var scanInput = document.getElementById('scanFileInput');
+    var scanBtn = document.getElementById('scanSendBtn');
+    var scanStatus = document.getElementById('scanStatus');
+    var serialInput = document.querySelector('#id_serial_number');
+    var enterBtn = document.getElementById('enterBtn');
+    var hiddenField = document.getElementById('scanned_photo_base64');
+    
+    console.log('scanInput:', scanInput);
+    console.log('scanBtn:', scanBtn);
+    console.log('enterBtn:', enterBtn);
+    console.log('hiddenField:', hiddenField);
+    
+    // Функция сканирования
+    function scanSend() {
+        if (!scanInput) {
+            console.error('scanInput не найден!');
+            return;
+        }
+        
+        var file = scanInput.files[0];
+        if (!file) {
+            if (scanStatus) {
+                scanStatus.style.display = 'block';
+                scanStatus.innerHTML = '<div class="alert alert-warning">Сначала выберите изображение</div>';
+            }
+            return;
+        }
+        
+        var formData = new FormData();
+        formData.append('scan_image', file);
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        
+        if (scanStatus) {
+            scanStatus.style.display = 'block';
+            scanStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Распознавание серийного номера...</div>';
+        }
+        
+        var scanUrl = '/gs14/scan-serial/';
+        console.log('Отправка на:', scanUrl);
+        
+        fetch(scanUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.json().then(function(data) {
+                    throw new Error(JSON.stringify(data));
+                });
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            console.log('Ответ сервера:', data);
+            var html = '';
+            
+            // ===== Сохраняем фото в скрытое поле =====
+            if (data.photo_base64) {
+                console.log('Получено фото, длина:', data.photo_base64.length);
+                
+                if (hiddenField) {
+                    hiddenField.value = 'data:image/jpeg;base64,' + data.photo_base64;
+                    console.log('✅ Фото сохранено в скрытое поле');
+                    console.log('Длина hiddenField.value:', hiddenField.value.length);
+                } else {
+                    console.error('❌ hiddenField не найден!');
+                    var form = document.getElementById('control-form');
+                    if (form) {
+                        var newHidden = document.createElement('input');
+                        newHidden.type = 'hidden';
+                        newHidden.id = 'scanned_photo_base64';
+                        newHidden.name = 'scanned_photo_base64';
+                        newHidden.value = 'data:image/jpeg;base64,' + data.photo_base64;
+                        form.appendChild(newHidden);
+                        console.log('✅ Создано новое скрытое поле');
+                        hiddenField = newHidden;
+                    }
+                }
+            } else {
+                console.warn('⚠️ photo_base64 не получен от сервера');
+            }
+            
+            if (data.success && data.serial_number) {
+                // Подставляем распознанный номер
+                if (serialInput) {
+                    serialInput.value = data.serial_number;
+                    serialInput.style.borderColor = '#28a745';
+                    serialInput.style.backgroundColor = '#f0fff0';
+                }
+                
+                // Показываем превью
+                if (data.photo_base64 && data.photo_base64.length > 100) {
+                    var container = document.getElementById('serial-photo-container');
+                    if (container) {
+                        var oldPreviews = container.querySelectorAll('.scan-preview');
+                        oldPreviews.forEach(function(el) { el.remove(); });
+                        
+                        var img = document.createElement('img');
+                        img.className = 'scan-preview';
+                        img.src = 'data:image/jpeg;base64,' + data.photo_base64;
+                        img.style.cssText = 'max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #28a745; padding: 3px; margin-top: 10px;';
+                        container.appendChild(img);
+                        
+                        var noImg = document.getElementById('no_serial_photo');
+                        if (noImg) noImg.style.display = 'none';
+                    }
+                }
+                
+                // ===== УБИРАЕМ ПРОВЕРКУ НА exists =====
+                // Просто показываем сообщение об успешном распознавании
+                html = '<div class="alert alert-success">' +
+                    '<i class="fas fa-check-circle"></i> ' +
+                    'Распознан номер: <strong>' + data.serial_number + '</strong>' +
+                '</div>';
+                html += '<div class="alert alert-info mt-2">' +
+                    '<i class="fas fa-info-circle"></i> ' +
+                    'Проверьте номер и нажмите кнопку "Создать" для сохранения объекта с фото.' +
+                '</div>';
+                
+                if (enterBtn) {
+                    enterBtn.style.backgroundColor = '#28a745';
+                    enterBtn.style.borderColor = '#28a745';
+                    enterBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Ввод ✓';
+                }
+                
+            } else {
+                // Ошибка
+                var errorMsg = data.error || 'Не удалось распознать серийный номер';
+                html = '<div class="alert alert-danger">' +
+                    '<i class="fas fa-times-circle"></i> ' + errorMsg +
+                '</div>';
+                html += '<div class="alert alert-warning mt-2">💡 Попробуйте:</div>';
+                html += '<ul class="text-muted">' +
+                    '<li>Сделать фото более четким</li>' +
+                    '<li>Обеспечить хорошее освещение</li>' +
+                    '<li>Расположить номер в центре кадра</li>' +
+                    '<li>Использовать контрастный фон</li>' +
+                '</ul>';
+                
+                // Если фото есть, но номер не распознан - все равно показываем фото
+                if (data.photo_base64 && data.photo_base64.length > 100) {
+                    html += '<div class="alert alert-info mt-2">📸 Фото загружено. Введите номер вручную.</div>';
+                    var container = document.getElementById('serial-photo-container');
+                    if (container) {
+                        var oldPreviews = container.querySelectorAll('.scan-preview');
+                        oldPreviews.forEach(function(el) { el.remove(); });
+                        
+                        var img = document.createElement('img');
+                        img.className = 'scan-preview';
+                        img.src = 'data:image/jpeg;base64,' + data.photo_base64;
+                        img.style.cssText = 'max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #ffc107; padding: 3px; margin-top: 10px;';
+                        container.appendChild(img);
+                        
+                        var noImg = document.getElementById('no_serial_photo');
+                        if (noImg) noImg.style.display = 'none';
+                    }
+                }
+                
+                if (serialInput) {
+                    serialInput.value = '';
+                    serialInput.style.borderColor = '#dc3545';
+                    serialInput.style.backgroundColor = '#fff0f0';
+                    serialInput.focus();
+                }
+            }
+            
+            if (scanStatus) {
+                scanStatus.innerHTML = html;
+            }
+        })
+        .catch(function(error) {
+            console.error('Ошибка:', error);
+            var errorMsg = 'Ошибка при сканировании';
+            try {
+                var errorData = JSON.parse(error.message);
+                errorMsg = errorData.error || errorData.message || errorMsg;
+            } catch (e) {
+                errorMsg = error.message || errorMsg;
+            }
+            if (scanStatus) {
+                scanStatus.innerHTML = '<div class="alert alert-danger">❌ ' + errorMsg + '</div>';
+            }
+        });
+    }
+    
+    // Привязываем обработчики
+    if (scanBtn) {
+        scanBtn.onclick = scanSend;
+        console.log('Обработчик для scanSend привязан');
+    }
+    
+    if (scanInput) {
+        scanInput.onchange = function() {
+            console.log('Файл выбран');
+            if (this.files[0]) {
+                this.style.borderColor = '#17a2b8';
+                this.style.backgroundColor = '#f0f8ff';
+                setTimeout(scanSend, 300);
+            }
+        };
+    }
+    
+    if (serialInput) {
+        serialInput.oninput = function() {
+            this.style.borderColor = '';
+            this.style.backgroundColor = '';
+            if (enterBtn) {
+                enterBtn.style.backgroundColor = '';
+                enterBtn.style.borderColor = '';
+                enterBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Ввод';
+            }
+        };
+    }
+    
+    console.log('=== СКРИПТ GS14 ГОТОВ ===');
+});
+
+// Функция предпросмотра изображения
+function previewImage(input, previewId, currentImgId, noImgId) {
+    var preview = document.getElementById(previewId);
+    if (!preview) return;
+    
+    var file = input.files[0];
+    if (file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = preview.querySelector('img');
+            if (img) {
+                img.src = e.target.result;
+            }
+            preview.style.display = 'block';
+            
+            if (currentImgId) {
+                var currentImg = document.getElementById(currentImgId);
+                if (currentImg) currentImg.style.display = 'none';
+            }
+            if (noImgId) {
+                var noImg = document.getElementById(noImgId);
+                if (noImg) noImg.style.display = 'none';
+            }
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+        if (currentImgId) {
+            var currentImg = document.getElementById(currentImgId);
+            if (currentImg) currentImg.style.display = '';
+        }
+        if (noImgId) {
+            var noImg = document.getElementById(noImgId);
+            if (noImg) noImg.style.display = '';
+        }
+    }
+}
+
+
 class AjaxFormHandler {
     constructor(options = {}) {
         this.objectId = options.objectId || null;
@@ -275,89 +551,181 @@ class AjaxFormHandler {
     
     // Инициализация функционала сканирования
     initScanFunctionality() {
-        const scanBtn = document.getElementById('scanSendBtn');
-        const scanInput = document.getElementById('scanFileInput');
-        const scanStatus = document.getElementById('scanStatus');
-        
-        if (!scanBtn || !scanInput) return;
-        
-        const scanSend = () => {
-            const file = scanInput.files[0];
-            if (!file) {
-                scanStatus.style.display = 'block';
-                scanStatus.innerHTML = '<div class="alert alert-warning">Сначала выберите изображение</div>';
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('scan_image', file);
-            formData.append('csrfmiddlewaretoken', this.csrfToken);
-            
-            const serialInput = document.querySelector('#id_serial_number');
-            if (serialInput && serialInput.value) {
-                formData.append('serial_number', serialInput.value);
-            }
-            
+    const scanBtn = document.getElementById('scanSendBtn');
+    const scanInput = document.getElementById('scanFileInput');
+    const scanStatus = document.getElementById('scanStatus');
+    
+    if (!scanBtn || !scanInput) return;
+    
+    const scanSend = () => {
+        const file = scanInput.files[0];
+        if (!file) {
             scanStatus.style.display = 'block';
-            scanStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Загрузка и распознавание...</div>';
+            scanStatus.innerHTML = '<div class="alert alert-warning">Сначала выберите изображение</div>';
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('scan_image', file);
+        formData.append('csrfmiddlewaretoken', this.csrfToken);
+        
+        scanStatus.style.display = 'block';
+        scanStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Распознавание серийного номера...</div>';
+        
+        const scanUrl = `/${this.namespace}/scan-serial/`;
+        
+        fetch(scanUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => {
+                    throw new Error(JSON.stringify(data));
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            const serialInput = document.querySelector('#id_serial_number');
+            const hiddenField = document.getElementById('scanned_photo_base64');
+            let html = '';
             
-            const scanUrl = `/${this.namespace}/scan-serial/`;
-            
-            fetch(scanUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
+            if (data.success && data.serial_number) {
+                // Подставляем распознанный номер в поле
+                if (serialInput) {
+                    serialInput.value = data.serial_number;
+                    serialInput.style.borderColor = '#28a745';
+                    serialInput.style.backgroundColor = '#f0fff0';
                 }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    if (data.serial_number) {
-                        serialInput.value = data.serial_number;
-                        serialInput.style.borderColor = '#28a745';
-                        serialInput.style.backgroundColor = '#f0fff0';
-                    }
-                    
-                    let html = '<div class="alert alert-success">' + (data.message || 'Найден: <strong>' + data.serial_number + '</strong>') + '</div>';
-                    if (data.photo_saved) {
-                        html += '<div class="alert alert-info mt-2">📸 Фото сохранено в объекте</div>';
-                    }
-                    scanStatus.innerHTML = html;
-                    
-                    if (data.serial_number) {
-                        const serialPhotoInput = document.getElementById('id_serial_photo');
-                        if (serialPhotoInput) {
-                            serialPhotoInput.value = '';
+                
+                // СОХРАНЯЕМ ФОТО В СКРЫТОЕ ПОЛЕ
+                if (hiddenField && data.photo_base64) {
+                    // Проверяем, что данные не пустые
+                    if (data.photo_base64.length > 100) {
+                        // Добавляем префикс для base64 изображения
+                        hiddenField.value = `data:image/jpeg;base64,${data.photo_base64}`;
+                        console.log('✅ Фото сохранено в скрытое поле, длина:', hiddenField.value.length);
+                        
+                        // Проверяем, что поле действительно заполнилось
+                        if (hiddenField.value.length > 100) {
+                            console.log('✅ Фото успешно сохранено!');
+                        } else {
+                            console.warn('⚠️ Фото не сохранилось в скрытое поле');
                         }
+                    } else {
+                        console.warn('⚠️ Фото слишком маленькое:', data.photo_base64.length);
                     }
                 } else {
-                    let html = '<div class="alert alert-warning">' + (data.error || 'Не удалось найти серийный номер') + '</div>';
-                    if (data.photo_saved) {
-                        html += '<div class="alert alert-success mt-2">📸 Фото сохранено в объекте</div>';
-                    }
-                    if (data.temp_object) {
-                        html += '<div class="alert alert-info mt-2">Создан временный объект. Отредактируйте серийный номер.</div>';
-                    }
-                    scanStatus.innerHTML = html;
+                    console.warn('⚠️ Нет данных для сохранения фото');
+                    console.warn('hiddenField:', hiddenField);
+                    console.warn('data.photo_base64:', data.photo_base64 ? data.photo_base64.substring(0, 50) : 'EMPTY');
                 }
-            })
-            .catch(error => {
-                console.error('Ошибка сканирования:', error);
-                scanStatus.innerHTML = '<div class="alert alert-danger">Ошибка: ' + error.message + '</div>';
-            });
-        };
-        
-        scanBtn.onclick = scanSend;
-        
-        scanInput.onchange = function() {
-            if (this.files[0]) {
-                this.style.borderColor = '#17a2b8';
-                this.style.backgroundColor = '#f0f8ff';
-                setTimeout(scanSend, 300);
+                
+                // Показываем превью фото
+                if (data.photo_base64 && data.photo_base64.length > 100) {
+                    this.showScanPreviewFromBase64(data.photo_base64);
+                }
+                
+                // Показываем сообщение
+                let existsMsg = data.exists ? ' ⚠️ Этот номер уже существует в базе!' : '';
+                html = `<div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> 
+                    Распознан номер: <strong>${data.serial_number}</strong>${existsMsg}
+                </div>`;
+                html += `<div class="alert alert-info mt-2">
+                    <i class="fas fa-info-circle"></i> 
+                    Проверьте номер и нажмите кнопку "Создать" для сохранения объекта с фото.
+                </div>`;
+                
+                if (data.exists) {
+                    html += `<div class="alert alert-warning mt-2">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        Внимание! Объект с таким номером уже существует. 
+                        <a href="/${this.namespace}/edit/${data.serial_number}/">Перейти к редактированию</a>
+                    </div>`;
+                }
+                
+                scanStatus.innerHTML = html;
+                
+            } else {
+                // Ошибка распознавания
+                let errorMsg = data.error || 'Не удалось распознать серийный номер';
+                html = `<div class="alert alert-danger">
+                    <i class="fas fa-times-circle"></i> ${errorMsg}
+                </div>`;
+                html += `<div class="alert alert-warning mt-2">💡 Попробуйте:</div>`;
+                html += `<ul class="text-muted">
+                    <li>Сделать фото более четким</li>
+                    <li>Обеспечить хорошее освещение</li>
+                    <li>Расположить номер в центре кадра</li>
+                    <li>Использовать контрастный фон</li>
+                </ul>`;
+                
+                scanStatus.innerHTML = html;
             }
-        };
-    }
+        })
+        .catch(error => {
+            console.error('Ошибка сканирования:', error);
+            scanStatus.innerHTML = `<div class="alert alert-danger">❌ Ошибка: ${error.message}</div>`;
+        });
+    };
+    
+    scanBtn.onclick = scanSend;
+    
+    scanInput.onchange = function() {
+        if (this.files[0]) {
+            this.style.borderColor = '#17a2b8';
+            this.style.backgroundColor = '#f0f8ff';
+            setTimeout(scanSend, 300);
+        }
+    };
+}
+
+// Показать превью из base64
+showScanPreviewFromBase64(base64Data) {
+    const container = document.getElementById('serial-photo-container');
+    if (!container) return;
+    
+    // Удаляем старые превью
+    const oldPreviews = container.querySelectorAll('.scan-preview');
+    oldPreviews.forEach(el => el.remove());
+    
+    // Создаем новое изображение
+    const img = document.createElement('img');
+    img.className = 'scan-preview';
+    img.src = `data:image/jpeg;base64,${base64Data}`;
+    img.style.cssText = 'max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #28a745; padding: 3px; margin-top: 10px;';
+    container.appendChild(img);
+    
+    // Скрываем "Нет изображения"
+    const noImg = document.getElementById('no_serial_photo');
+    if (noImg) noImg.style.display = 'none';
+}
+
+// Показать превью из base64
+showScanPreviewFromBase64(base64Data) {
+    const container = document.getElementById('serial-photo-container');
+    if (!container) return;
+    
+    // Удаляем старые превью
+    const oldPreviews = container.querySelectorAll('.scan-preview');
+    oldPreviews.forEach(el => el.remove());
+    
+    // Создаем новое изображение
+    const img = document.createElement('img');
+    img.className = 'scan-preview';
+    img.src = `data:image/jpeg;base64,${base64Data}`;
+    img.style.cssText = 'max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #28a745; padding: 3px; margin-top: 10px;';
+    container.appendChild(img);
+    
+    // Скрываем "Нет изображения"
+    const noImg = document.getElementById('no_serial_photo');
+    if (noImg) noImg.style.display = 'none';
+}
     
     // Вспомогательные методы
     showFieldLoading(fieldName, isLoading) {

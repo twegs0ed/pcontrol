@@ -129,6 +129,7 @@
                         data-namespace="{{ namespace }}">
                         {% csrf_token %}
 
+                        <input type="hidden" id="scanned_photo_base64" name="scanned_photo_base64" value="">
                         {% if form.errors %}
                             <div class="alert alert-danger">
                                 <i class="fas fa-exclamation-circle"></i>
