@@ -643,6 +643,7 @@ def ajax_save_image(request, pk, field_name):
     AJAX-сохранение изображения для конкретного поля
     """
     try:
+        from .models import Control  # Или ваша модель
         control = get_object_or_404(Control, pk=pk)
         
         # Проверка прав
@@ -653,7 +654,8 @@ def ajax_save_image(request, pk, field_name):
             }, status=403)
         
         # Проверка, что поле существует
-        if field_name not in ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7', 'serial_photo']:
+        valid_fields = ['image1', 'image2', 'image3', 'image4', 'image5', 'image6', 'image7', 'serial_photo']
+        if field_name not in valid_fields:
             return JsonResponse({
                 'success': False,
                 'error': f'Поле {field_name} не существует'
@@ -673,10 +675,16 @@ def ajax_save_image(request, pk, field_name):
         
         # Проверяем, завершен ли объект
         is_completed = control.is_completed()
+        
+        # Если все фото загружены - меняем статус и готовим редирект
+        redirect_url = None
         if is_completed and control.status != 'closed':
             control.status = 'completed'
             control.completed_at = timezone.now()
             control.save()
+            
+            # Готовим URL для редиректа на список
+            redirect_url = reverse('gs14:control_list')
         
         # Формируем ответ
         response_data = {
@@ -685,7 +693,9 @@ def ajax_save_image(request, pk, field_name):
             'image_url': getattr(control, field_name).url if getattr(control, field_name) else None,
             'is_completed': is_completed,
             'status': control.status,
-            'status_display': control.get_status_display()
+            'status_display': control.get_status_display(),
+            'redirect_url': redirect_url,  # Добавляем URL для редиректа
+            'redirect_message': '✅ Все фото загружены! Объект завершен. Перенаправление на список...'
         }
         
         return JsonResponse(response_data)
@@ -747,20 +757,26 @@ def ajax_check_completed(request, pk):
     Проверка, завершен ли объект
     """
     try:
+        from .models import Control
+        from django.urls import reverse
+        
         control = get_object_or_404(Control, pk=pk)
         
         is_completed = control.is_completed()
         
+        redirect_url = None
         if is_completed and control.status != 'closed':
             control.status = 'completed'
             control.completed_at = timezone.now()
             control.save()
+            redirect_url = reverse('gs14:control_list')
         
         return JsonResponse({
             'success': True,
             'is_completed': is_completed,
             'status': control.status,
             'status_display': control.get_status_display(),
+            'redirect_url': redirect_url,
             'message': 'Объект завершен!' if is_completed else 'Не все фото загружены'
         })
         

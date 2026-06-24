@@ -19,6 +19,7 @@ from PIL import Image, ImageEnhance
 import pytesseract
 import tempfile
 import time
+from django.urls import reverse
 
 
 from django.views.decorators.csrf import csrf_exempt
@@ -644,7 +645,7 @@ def ajax_save_image(request, pk, field_name):
     AJAX-сохранение изображения для конкретного поля
     """
     try:
-        from .models import KT08_9a
+        from .models import KT08_9a  # Или ваша модель
         control = get_object_or_404(KT08_9a, pk=pk)
         
         # Проверка прав
@@ -676,10 +677,16 @@ def ajax_save_image(request, pk, field_name):
         
         # Проверяем, завершен ли объект
         is_completed = control.is_completed()
+        
+        # Если все фото загружены - меняем статус и готовим редирект
+        redirect_url = None
         if is_completed and control.status != 'closed':
             control.status = 'completed'
             control.completed_at = timezone.now()
             control.save()
+            
+            # Готовим URL для редиректа на список
+            redirect_url = reverse('kt08_9a:control_list')
         
         # Формируем ответ
         response_data = {
@@ -688,7 +695,9 @@ def ajax_save_image(request, pk, field_name):
             'image_url': getattr(control, field_name).url if getattr(control, field_name) else None,
             'is_completed': is_completed,
             'status': control.status,
-            'status_display': control.get_status_display()
+            'status_display': control.get_status_display(),
+            'redirect_url': redirect_url,  # Добавляем URL для редиректа
+            'redirect_message': '✅ Все фото загружены! Объект завершен. Перенаправление на список...'
         }
         
         return JsonResponse(response_data)
@@ -753,20 +762,25 @@ def ajax_check_completed(request, pk):
     """
     try:
         from .models import KT08_9a
+        from django.urls import reverse
+        
         control = get_object_or_404(KT08_9a, pk=pk)
         
         is_completed = control.is_completed()
         
+        redirect_url = None
         if is_completed and control.status != 'closed':
             control.status = 'completed'
             control.completed_at = timezone.now()
             control.save()
+            redirect_url = reverse('kt08_9a:control_list')
         
         return JsonResponse({
             'success': True,
             'is_completed': is_completed,
             'status': control.status,
             'status_display': control.get_status_display(),
+            'redirect_url': redirect_url,
             'message': 'Объект завершен!' if is_completed else 'Не все фото загружены'
         })
         
