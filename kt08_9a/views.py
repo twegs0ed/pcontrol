@@ -130,6 +130,12 @@ class KT08_9aDetailView(LoginRequiredMixin, DetailView):
         context['app_name'] = 'KT08_9a'
         context['namespace'] = 'kt08_9a'  # ДОБАВЛЕНО
         context['header_color'] = 'bg-success'  # ДОБАВЛЕНО
+        model = self.object._meta.model
+        verbose_names = {}
+        for field in model._meta.fields:
+            if field.name.startswith('title'):
+                verbose_names[field.name] = field.verbose_name
+        context['verbose_names'] = verbose_names    
         return context
 
 

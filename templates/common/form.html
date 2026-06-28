@@ -13,7 +13,7 @@
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-10">
+        <div class="col-md-12">
             <div class="card shadow-sm">
                 <div class="card-header {{ header_color|default:'bg-primary' }} text-white d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">
@@ -32,7 +32,7 @@
                 <div class="card-body">
                     <!-- Контейнер для AJAX сообщений -->
                     <div id="form-messages"></div>
-                    <!-- Остальной контент -->
+                    
                     <!-- Статус объекта -->
                     {% if object %}
                         <div class="card mb-3">
@@ -130,6 +130,7 @@
                         {% csrf_token %}
 
                         <input type="hidden" id="scanned_photo_base64" name="scanned_photo_base64" value="">
+                        
                         {% if form.errors %}
                             <div class="alert alert-danger">
                                 <i class="fas fa-exclamation-circle"></i>
@@ -194,7 +195,6 @@
                                                 <button type="button" class="btn btn-success w-100 btn-sm" id="scanSendBtn">
                                                     <i class="fas fa-camera"></i>
                                                 </button>
-                                                <!-- ВАЖНО: type="button" а не type="submit" -->
                                             </div>
                                         </div>
                                         <div id="scanStatus" class="mt-2" style="display: none;"></div>
@@ -202,53 +202,53 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <!-- Фото серийного номера (ДОБАВЛЕНО) -->
-                            <div class="row mb-3">
-                                <div class="col-md-12">
-                                    <div class="form-group">
-                                        <label for="{{ form.serial_photo.id_for_label }}" class="form-label fw-bold">
-                                            {{ form.serial_photo.label }}
-                                        </label>
-                                        
-                                        <div class="image-preview-container">
-                                            {% if object and object.serial_photo %}
-                                                <div class="current-image-wrapper">
-                                                    <img src="{{ object.serial_photo.url }}" alt="Фото серийного номера" 
-                                                        style="max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #17a2b8; padding: 3px;">
-                                                    <span class="badge bg-info ms-2">Текущее фото</span>
-                                                </div>
-                                                <div class="delete-checkbox">
-                                                    <input type="checkbox" name="delete_serial_photo" id="delete_serial_photo">
-                                                    <label for="delete_serial_photo" class="text-danger">Удалить</label>
-                                                </div>
-                                                <div id="no_serial_photo" style="display: none;" class="no-image-text">Нет изображения</div>
-                                            {% else %}
-                                                <div id="no_serial_photo" class="no-image-text">Нет изображения</div>
-                                                <div id="current_serial_photo" style="display: none;"></div>
-                                            {% endif %}
-                                        </div>
-                                        
-                                        <div class="file-input-wrapper">
-                                            {{ form.serial_photo }}
-                                        </div>
-                                        
-                                        <div id="preview_serial_photo" style="display: none; margin-top: 5px;">
-                                            <img src="#" alt="Предпросмотр" class="preview-image" style="max-width: 150px; max-height: 150px;">
-                                            <small class="text-success ms-1">Новое изображение</small>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary remove-preview" data-image="serial">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
-                                        
-                                        {% if form.serial_photo.help_text %}
-                                            <div class="form-text text-muted small">{{ form.serial_photo.help_text }}</div>
-                                        {% endif %}
-                                        {% if form.serial_photo.errors %}
-                                            <div class="alert alert-danger mt-1">{{ form.serial_photo.errors }}</div>
+
+                        <!-- Фото серийного номера -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="{{ form.serial_photo.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.serial_photo.label }}
+                                    </label>
+                                    
+                                    <div class="image-preview-container" id="serial-photo-container">
+                                        {% if object and object.serial_photo %}
+                                            <div class="current-image-wrapper">
+                                                <img src="{{ object.serial_photo.url }}" alt="Фото серийного номера" 
+                                                    style="max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #17a2b8; padding: 3px;">
+                                                <span class="badge bg-info ms-2">Текущее фото</span>
+                                            </div>
+                                            <div class="delete-checkbox">
+                                                <input type="checkbox" name="delete_serial_photo" id="delete_serial_photo">
+                                                <label for="delete_serial_photo" class="text-danger">Удалить</label>
+                                            </div>
+                                            <div id="no_serial_photo" style="display: none;" class="no-image-text">Нет изображения</div>
+                                        {% else %}
+                                            <div id="no_serial_photo" class="no-image-text">Нет изображения</div>
                                         {% endif %}
                                     </div>
+                                    
+                                    <div class="file-input-wrapper">
+                                        {{ form.serial_photo }}
+                                    </div>
+                                    
+                                    <div id="preview_serial_photo" style="display: none; margin-top: 5px;">
+                                        <img src="#" alt="Предпросмотр" class="preview-image" style="max-width: 150px; max-height: 150px;">
+                                        <small class="text-success ms-1">Новое изображение</small>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary remove-preview" data-image="serial">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    {% if form.serial_photo.help_text %}
+                                        <div class="form-text text-muted small">{{ form.serial_photo.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.serial_photo.errors %}
+                                        <div class="alert alert-danger mt-1">{{ form.serial_photo.errors }}</div>
+                                    {% endif %}
                                 </div>
                             </div>
+                        </div>
 
                         <!-- Описание -->
                         <div class="row mb-3">
@@ -262,7 +262,7 @@
                             </div>
                         </div>
 
-                        <!-- Группы 1-7 -->
+                        <!-- Группы изображений - явно прописанные для GS14 (7 групп) -->
                         <div class="row g-3">
                             <!-- Группа 1 -->
                             <div class="col-md-6">
@@ -278,7 +278,8 @@
                                             {% if object and object.image1 %}
                                                 <div class="d-flex align-items-center gap-2 mb-1">
                                                     <img src="{{ object.image1.url }}" 
-                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" id="current_image1">
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image1">
                                                     <span class="badge bg-success">Есть</span>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" 
@@ -314,7 +315,8 @@
                                             {% if object and object.image2 %}
                                                 <div class="d-flex align-items-center gap-2 mb-1">
                                                     <img src="{{ object.image2.url }}" 
-                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" id="current_image2">
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image2">
                                                     <span class="badge bg-success">Есть</span>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" 
@@ -350,7 +352,8 @@
                                             {% if object and object.image3 %}
                                                 <div class="d-flex align-items-center gap-2 mb-1">
                                                     <img src="{{ object.image3.url }}" 
-                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" id="current_image3">
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image3">
                                                     <span class="badge bg-success">Есть</span>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" 
@@ -386,7 +389,8 @@
                                             {% if object and object.image4 %}
                                                 <div class="d-flex align-items-center gap-2 mb-1">
                                                     <img src="{{ object.image4.url }}" 
-                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" id="current_image4">
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image4">
                                                     <span class="badge bg-success">Есть</span>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" 
@@ -422,7 +426,8 @@
                                             {% if object and object.image5 %}
                                                 <div class="d-flex align-items-center gap-2 mb-1">
                                                     <img src="{{ object.image5.url }}" 
-                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" id="current_image5">
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image5">
                                                     <span class="badge bg-success">Есть</span>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" 
@@ -458,7 +463,8 @@
                                             {% if object and object.image6 %}
                                                 <div class="d-flex align-items-center gap-2 mb-1">
                                                     <img src="{{ object.image6.url }}" 
-                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" id="current_image6">
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image6">
                                                     <span class="badge bg-success">Есть</span>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" 
@@ -494,7 +500,8 @@
                                             {% if object and object.image7 %}
                                                 <div class="d-flex align-items-center gap-2 mb-1">
                                                     <img src="{{ object.image7.url }}" 
-                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" id="current_image7">
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image7">
                                                     <span class="badge bg-success">Есть</span>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" 
@@ -738,6 +745,14 @@ document.addEventListener('DOMContentLoaded', function() {
             previewImage(this, 'preview_image7', 'current_image7', 'no_image7');
         });
     }
+
+    // Предпросмотр для фото серийного номера
+    var serialPhotoInput = document.querySelector('#id_serial_photo');
+    if (serialPhotoInput) {
+        serialPhotoInput.addEventListener('change', function() {
+            previewImage(this, 'preview_serial_photo', null, 'no_serial_photo');
+        });
+    }
 });
 
 // Сканирование
@@ -746,10 +761,12 @@ var scanBtn = document.getElementById('scanSendBtn');
 var scanStatus = document.getElementById('scanStatus');
 var serialInput = document.querySelector('#id_serial_number');
 var enterBtn = document.getElementById('enterBtn');
+var hiddenField = document.getElementById('scanned_photo_base64');
 
 console.log('scanInput:', scanInput);
 console.log('scanBtn:', scanBtn);
 console.log('enterBtn:', enterBtn);
+console.log('hiddenField:', hiddenField);
 
 function scanSend() {
     var file = scanInput.files[0];
@@ -763,7 +780,6 @@ function scanSend() {
     formData.append('scan_image', file);
     formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
     
-    // Добавляем текущий серийный номер если он есть
     var currentSerial = serialInput ? serialInput.value : '';
     if (currentSerial) {
         formData.append('serial_number', currentSerial);
@@ -772,7 +788,7 @@ function scanSend() {
     scanStatus.style.display = 'block';
     scanStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Загрузка и распознавание...</div>';
     
-    var scanUrl = '{{ scan_url|default:"/kt08_9a/scan-serial/" }}';
+    var scanUrl = '{{ scan_url|default:"/" }}{{ namespace }}/scan-serial/';
     
     fetch(scanUrl, {
         method: 'POST',
@@ -790,11 +806,39 @@ function scanSend() {
         return response.json();
     })
     .then(function(data) {
+        console.log('Ответ сервера:', data);
+        
+        if (data.photo_base64) {
+            if (hiddenField) {
+                hiddenField.value = 'data:image/jpeg;base64,' + data.photo_base64;
+                console.log('✅ Фото сохранено в скрытое поле');
+            } else {
+                console.error('❌ hiddenField не найден!');
+            }
+        }
+        
         if (data.success) {
             if (data.serial_number) {
                 serialInput.value = data.serial_number;
                 serialInput.style.borderColor = '#28a745';
                 serialInput.style.backgroundColor = '#f0fff0';
+            }
+            
+            if (data.photo_base64) {
+                var container = document.getElementById('serial-photo-container');
+                if (container) {
+                    var oldPreviews = container.querySelectorAll('.scan-preview');
+                    oldPreviews.forEach(function(el) { el.remove(); });
+                    
+                    var img = document.createElement('img');
+                    img.className = 'scan-preview';
+                    img.src = 'data:image/jpeg;base64,' + data.photo_base64;
+                    img.style.cssText = 'max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #28a745; padding: 3px; margin-top: 10px;';
+                    container.appendChild(img);
+                    
+                    var noImg = document.getElementById('no_serial_photo');
+                    if (noImg) noImg.style.display = 'none';
+                }
             }
             
             var message = data.message || 'Найден: <strong>' + data.serial_number + '</strong>';
@@ -830,8 +874,6 @@ function scanSend() {
     });
 }
 
-
-
 if (scanBtn) {
     scanBtn.onclick = scanSend;
     console.log('Обработчик для scanSend привязан');
@@ -863,9 +905,7 @@ if (serialInput) {
 console.log('=== СКРИПТ {{ app_name }} ГОТОВ ===');
 </script>
 
-
-
-
 <!-- Подключаем AJAX скрипт -->
+
 <script src="{% static 'js/ajax_form.js' %}"></script>
 {% endblock extra_js %}

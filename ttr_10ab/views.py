@@ -93,7 +93,7 @@ class TTR10ABListView(LoginRequiredMixin, ListView):
 class TTR10ABDetailView(LoginRequiredMixin, DetailView):
     """Детальная страница объекта TTR-10AB"""
     model = TTR10AB
-    template_name = 'common/detail_1.html'
+    template_name = 'common/detail.html'
     context_object_name = 'control'
     
     def get_queryset(self):
@@ -116,6 +116,12 @@ class TTR10ABDetailView(LoginRequiredMixin, DetailView):
         context['app_name'] = 'TTR-10AB'
         context['namespace'] = 'ttr_10ab'
         context['header_color'] = 'bg-warning'
+        model = self.object._meta.model
+        verbose_names = {}
+        for field in model._meta.fields:
+            if field.name.startswith('title'):
+                verbose_names[field.name] = field.verbose_name
+        context['verbose_names'] = verbose_names
         return context
 
 

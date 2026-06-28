@@ -152,6 +152,12 @@ class ControlDetailView(LoginRequiredMixin, DetailView):
         context['app_name'] = 'GS14'
         context['namespace'] = 'gs14'
         context['header_color'] = 'bg-primary'
+        model = self.object._meta.model
+        verbose_names = {}
+        for field in model._meta.fields:
+            if field.name.startswith('title'):
+                verbose_names[field.name] = field.verbose_name
+        context['verbose_names'] = verbose_names
         return context
 
 
