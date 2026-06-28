@@ -33,6 +33,7 @@ urlpatterns = [
         template_name='registration/login.html'
     ), name='login'),
     path('logout/', custom_logout, name='logout'),
+    path('ttr_10ab/', include('ttr_10ab.urls')),
     
     
 

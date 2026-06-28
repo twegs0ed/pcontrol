@@ -1,0 +1,915 @@
+<!-- templates/common/form_1.html -->
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+    {% if is_create %}
+        Создание объекта {{ app_name }}
+    {% else %}
+        Редактирование объекта {{ app_name }}
+    {% endif %}
+{% endblock title %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header {{ header_color|default:'bg-primary' }} text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        {% if is_create %}
+                            <i class="fas fa-plus-circle"></i> Создание объекта {{ app_name }}
+                        {% else %}
+                            <i class="fas fa-edit"></i> Редактирование объекта {{ app_name }}
+                        {% endif %}
+                    </h4>
+                    {% if is_controller or user.is_superuser %}
+                        <a href="{% url namespace|add:':control_create' %}" class="btn btn-light btn-sm">
+                            <i class="fas fa-plus"></i> Создать новый
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <!-- Контейнер для AJAX сообщений -->
+                    <div id="form-messages"></div>
+                    
+                    <!-- Статус объекта -->
+                    {% if object %}
+                        <div class="card mb-3">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                                    <div>
+                                        <span class="fw-bold">Статус:</span>
+                                        {% if object.status == 'draft' %}
+                                            <span class="badge-status draft">Черновик</span>
+                                        {% elif object.status == 'in_progress' %}
+                                            <span class="badge-status in_progress">В процессе</span>
+                                        {% elif object.status == 'completed' %}
+                                            <span class="badge-status completed">Завершен</span>
+                                        {% elif object.status == 'closed' %}
+                                            <span class="badge-status closed">Закрыт</span>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        {% if object.status == 'draft' %}
+                                            <span class="text-warning fw-bold">
+                                                <i class="fas fa-pencil-alt"></i> Черновик
+                                                {% if not is_superuser %}
+                                                    <br><small class="text-muted">Доступно для редактирования</small>
+                                                {% endif %}
+                                            </span>
+                                        {% elif object.status == 'in_progress' %}
+                                            <span class="text-primary fw-bold">
+                                                <i class="fas fa-spinner"></i> В процессе
+                                                {% if not is_superuser %}
+                                                    <br><small class="text-muted">Доступно для редактирования</small>
+                                                {% endif %}
+                                            </span>
+                                        {% elif object.status == 'completed' %}
+                                            <span class="text-success fw-bold">
+                                                <i class="fas fa-check-circle"></i> Завершен
+                                                {% if not is_superuser %}
+                                                    <br><small class="text-danger">Редактирование недоступно</small>
+                                                {% endif %}
+                                            </span>
+                                        {% elif object.status == 'closed' %}
+                                            <span class="text-danger fw-bold">
+                                                <i class="fas fa-lock"></i> Закрыт
+                                                <br><small class="text-muted">Редактирование недоступно</small>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <!-- Если объект завершен или закрыт - показываем сообщение -->
+                    {% if object and object.status in 'completed,closed' and not is_superuser %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-lock"></i>
+                            <strong>Редактирование недоступно!</strong>
+                            {% if object.status == 'completed' %}
+                                Объект завершен. Все фото загружены.
+                            {% elif object.status == 'closed' %}
+                                Объект закрыт для редактирования.
+                            {% endif %}
+                            {% if object.completed_at %}
+                                <br>
+                                <small>Дата завершения: {{ object.completed_at|date:"d.m.Y H:i" }}</small>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Если объект черновик - показываем подсказку -->
+                    {% if object and object.status == 'draft' and not is_superuser %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Черновик!</strong>
+                            Заполните все поля и загрузите все фото для завершения объекта.
+                        </div>
+                    {% endif %}
+
+                    {% if is_create %}
+                        <div class="alert alert-info alert-dismissible fade show">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Создание:</strong> Введите серийный номер и нажмите "Проверить"
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info alert-dismissible fade show">
+                            <i class="fas fa-edit"></i>
+                            Редактирование {{ app_name }}: <strong>{{ object.serial_number }}</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endif %}
+
+                    <form method="post" enctype="multipart/form-data" id="control-form"
+                        data-object-id="{% if object %}{{ object.pk }}{% endif %}"
+                        data-namespace="{{ namespace }}">
+                        {% csrf_token %}
+
+                        <!-- Скрытое поле для фото из сканирования -->
+                        <input type="hidden" id="scanned_photo_base64" name="scanned_photo_base64" value="">
+                        
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle"></i>
+                                <strong>Ошибка!</strong> Проверьте данные:
+                                <ul class="mb-0">
+                                    {% for field, errors in form.errors.items %}
+                                        {% for error in errors %}
+                                            <li>{{ field }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+
+                        <!-- Серийный номер -->
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label for="{{ form.serial_number.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.serial_number.label }}
+                                        {% if is_create %}<span class="text-danger">*</span>{% endif %}
+                                        {% if not is_create and not is_superuser %}
+                                            <span class="badge bg-warning text-dark ms-1">Только для чтения</span>
+                                        {% endif %}
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.serial_number }}
+                                        {% if is_create %}
+                                            <button type="submit" name="check_serial" value="1" class="btn btn-primary" 
+                                                    formaction="{% url namespace|add:':check_serial' %}" formmethod="post" id="enterBtn">
+                                                <i class="fas fa-arrow-right"></i> Проверить
+                                            </button>
+                                        {% else %}
+                                            <span class="input-group-text bg-light">
+                                                {% if is_superuser %}
+                                                    <i class="fas fa-edit text-primary" title="Доступно для редактирования"></i>
+                                                {% else %}
+                                                    <i class="fas fa-lock text-muted" title="Только для администратора"></i>
+                                                {% endif %}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    {% if form.serial_number.help_text %}
+                                        <div class="form-text text-muted small">{{ form.serial_number.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.serial_number.errors %}
+                                        <div class="alert alert-danger mt-1">{{ form.serial_number.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                {% if is_create %}
+                                    <div class="form-group">
+                                        <label class="form-label fw-bold">Сканировать</label>
+                                        <div class="row g-2">
+                                            <div class="col-8">
+                                                <input type="file" id="scanFileInput" accept="image/*" capture="environment"
+                                                    class="form-control form-control-sm" 
+                                                    style="padding: 8px; border: 2px dashed #28a745; background: #f0fff0;">
+                                            </div>
+                                            <div class="col-4">
+                                                <button type="button" class="btn btn-success w-100 btn-sm" id="scanSendBtn">
+                                                    <i class="fas fa-camera"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="scanStatus" class="mt-2" style="display: none;"></div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Фото серийного номера -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="{{ form.serial_photo.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.serial_photo.label }}
+                                    </label>
+                                    
+                                    <div class="image-preview-container" id="serial-photo-container">
+                                        {% if object and object.serial_photo %}
+                                            <div class="current-image-wrapper">
+                                                <img src="{{ object.serial_photo.url }}" alt="Фото серийного номера" 
+                                                    style="max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #17a2b8; padding: 3px;">
+                                                <span class="badge bg-info ms-2">Текущее фото</span>
+                                            </div>
+                                            <div class="delete-checkbox">
+                                                <input type="checkbox" name="delete_serial_photo" id="delete_serial_photo">
+                                                <label for="delete_serial_photo" class="text-danger">Удалить</label>
+                                            </div>
+                                            <div id="no_serial_photo" style="display: none;" class="no-image-text">Нет изображения</div>
+                                        {% else %}
+                                            <div id="no_serial_photo" class="no-image-text">Нет изображения</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="file-input-wrapper">
+                                        {{ form.serial_photo }}
+                                    </div>
+                                    
+                                    <div id="preview_serial_photo" style="display: none; margin-top: 5px;">
+                                        <img src="#" alt="Предпросмотр" class="preview-image" style="max-width: 150px; max-height: 150px;">
+                                        <small class="text-success ms-1">Новое изображение</small>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary remove-preview" data-image="serial">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    {% if form.serial_photo.help_text %}
+                                        <div class="form-text text-muted small">{{ form.serial_photo.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.serial_photo.errors %}
+                                        <div class="alert alert-danger mt-1">{{ form.serial_photo.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Описание -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">
+                                        {{ form.description.label }}
+                                    </label>
+                                    {{ form.description }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Группы изображений - явно прописанные для TTR-10AB (8 групп) -->
+                        <div class="row g-3">
+                            <!-- Группа 1: Механизм вид сверху -->
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header bg-light py-1">
+                                        <small class="fw-bold">{{ form.title1.label }}</small>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="form-group mb-2">
+                                            {{ form.title1 }}
+                                        </div>
+                                        <div class="form-group">
+                                            {% if object and object.image1 %}
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <img src="{{ object.image1.url }}" 
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image1">
+                                                    <span class="badge bg-success">Есть</span>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="delete_image1" id="delete_image1" style="margin-top: 0;">
+                                                        <label class="form-check-label text-danger" for="delete_image1" style="font-size: 0.75rem;">
+                                                            Удалить
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted small mb-1" id="no_image1">Нет изображения</div>
+                                            {% endif %}
+                                            {{ form.image1 }}
+                                            <div id="preview_image1" class="mt-1" style="display: none;">
+                                                <img src="#" alt="Предпросмотр" style="max-width: 50px; max-height: 50px; border-radius: 4px; border: 2px solid #28a745; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Группа 2: Механизм вид справа -->
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header bg-light py-1">
+                                        <small class="fw-bold">{{ form.title2.label }}</small>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="form-group mb-2">
+                                            {{ form.title2 }}
+                                        </div>
+                                        <div class="form-group">
+                                            {% if object and object.image2 %}
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <img src="{{ object.image2.url }}" 
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image2">
+                                                    <span class="badge bg-success">Есть</span>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="delete_image2" id="delete_image2" style="margin-top: 0;">
+                                                        <label class="form-check-label text-danger" for="delete_image2" style="font-size: 0.75rem;">
+                                                            Удалить
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted small mb-1" id="no_image2">Нет изображения</div>
+                                            {% endif %}
+                                            {{ form.image2 }}
+                                            <div id="preview_image2" class="mt-1" style="display: none;">
+                                                <img src="#" alt="Предпросмотр" style="max-width: 50px; max-height: 50px; border-radius: 4px; border: 2px solid #28a745; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Группа 3: Механизм вид слева -->
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header bg-light py-1">
+                                        <small class="fw-bold">{{ form.title3.label }}</small>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="form-group mb-2">
+                                            {{ form.title3 }}
+                                        </div>
+                                        <div class="form-group">
+                                            {% if object and object.image3 %}
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <img src="{{ object.image3.url }}" 
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image3">
+                                                    <span class="badge bg-success">Есть</span>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="delete_image3" id="delete_image3" style="margin-top: 0;">
+                                                        <label class="form-check-label text-danger" for="delete_image3" style="font-size: 0.75rem;">
+                                                            Удалить
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted small mb-1" id="no_image3">Нет изображения</div>
+                                            {% endif %}
+                                            {{ form.image3 }}
+                                            <div id="preview_image3" class="mt-1" style="display: none;">
+                                                <img src="#" alt="Предпросмотр" style="max-width: 50px; max-height: 50px; border-radius: 4px; border: 2px solid #28a745; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Группа 4: Турникет вид сверху -->
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header bg-light py-1">
+                                        <small class="fw-bold">{{ form.title4.label }}</small>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="form-group mb-2">
+                                            {{ form.title4 }}
+                                        </div>
+                                        <div class="form-group">
+                                            {% if object and object.image4 %}
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <img src="{{ object.image4.url }}" 
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image4">
+                                                    <span class="badge bg-success">Есть</span>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="delete_image4" id="delete_image4" style="margin-top: 0;">
+                                                        <label class="form-check-label text-danger" for="delete_image4" style="font-size: 0.75rem;">
+                                                            Удалить
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted small mb-1" id="no_image4">Нет изображения</div>
+                                            {% endif %}
+                                            {{ form.image4 }}
+                                            <div id="preview_image4" class="mt-1" style="display: none;">
+                                                <img src="#" alt="Предпросмотр" style="max-width: 50px; max-height: 50px; border-radius: 4px; border: 2px solid #28a745; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Группа 5: Турникет вид слева -->
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header bg-light py-1">
+                                        <small class="fw-bold">{{ form.title5.label }}</small>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="form-group mb-2">
+                                            {{ form.title5 }}
+                                        </div>
+                                        <div class="form-group">
+                                            {% if object and object.image5 %}
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <img src="{{ object.image5.url }}" 
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image5">
+                                                    <span class="badge bg-success">Есть</span>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="delete_image5" id="delete_image5" style="margin-top: 0;">
+                                                        <label class="form-check-label text-danger" for="delete_image5" style="font-size: 0.75rem;">
+                                                            Удалить
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted small mb-1" id="no_image5">Нет изображения</div>
+                                            {% endif %}
+                                            {{ form.image5 }}
+                                            <div id="preview_image5" class="mt-1" style="display: none;">
+                                                <img src="#" alt="Предпросмотр" style="max-width: 50px; max-height: 50px; border-radius: 4px; border: 2px solid #28a745; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Группа 6: Турникет вид справа -->
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header bg-light py-1">
+                                        <small class="fw-bold">{{ form.title6.label }}</small>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="form-group mb-2">
+                                            {{ form.title6 }}
+                                        </div>
+                                        <div class="form-group">
+                                            {% if object and object.image6 %}
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <img src="{{ object.image6.url }}" 
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image6">
+                                                    <span class="badge bg-success">Есть</span>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="delete_image6" id="delete_image6" style="margin-top: 0;">
+                                                        <label class="form-check-label text-danger" for="delete_image6" style="font-size: 0.75rem;">
+                                                            Удалить
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted small mb-1" id="no_image6">Нет изображения</div>
+                                            {% endif %}
+                                            {{ form.image6 }}
+                                            <div id="preview_image6" class="mt-1" style="display: none;">
+                                                <img src="#" alt="Предпросмотр" style="max-width: 50px; max-height: 50px; border-radius: 4px; border: 2px solid #28a745; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Группа 7: Турникет вид сзади -->
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header bg-light py-1">
+                                        <small class="fw-bold">{{ form.title7.label }}</small>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="form-group mb-2">
+                                            {{ form.title7 }}
+                                        </div>
+                                        <div class="form-group">
+                                            {% if object and object.image7 %}
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <img src="{{ object.image7.url }}" 
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image7">
+                                                    <span class="badge bg-success">Есть</span>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="delete_image7" id="delete_image7" style="margin-top: 0;">
+                                                        <label class="form-check-label text-danger" for="delete_image7" style="font-size: 0.75rem;">
+                                                            Удалить
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted small mb-1" id="no_image7">Нет изображения</div>
+                                            {% endif %}
+                                            {{ form.image7 }}
+                                            <div id="preview_image7" class="mt-1" style="display: none;">
+                                                <img src="#" alt="Предпросмотр" style="max-width: 50px; max-height: 50px; border-radius: 4px; border: 2px solid #28a745; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Группа 8: Комплектность -->
+                            <div class="col-md-6">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-header bg-light py-1">
+                                        <small class="fw-bold">{{ form.title8.label }}</small>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="form-group mb-2">
+                                            {{ form.title8 }}
+                                        </div>
+                                        <div class="form-group">
+                                            {% if object and object.image8 %}
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <img src="{{ object.image8.url }}" 
+                                                         alt="Фото" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover;" 
+                                                         id="current_image8">
+                                                    <span class="badge bg-success">Есть</span>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="delete_image8" id="delete_image8" style="margin-top: 0;">
+                                                        <label class="form-check-label text-danger" for="delete_image8" style="font-size: 0.75rem;">
+                                                            Удалить
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted small mb-1" id="no_image8">Нет изображения</div>
+                                            {% endif %}
+                                            {{ form.image8 }}
+                                            <div id="preview_image8" class="mt-1" style="display: none;">
+                                                <img src="#" alt="Предпросмотр" style="max-width: 50px; max-height: 50px; border-radius: 4px; border: 2px solid #28a745; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Кнопки -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url namespace|add:':control_list' %}" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-arrow-left"></i> Назад
+                            </a>
+                            <div>
+                                {% if not is_create %}
+                                    {% if can_edit %}
+                                        <button type="submit" class="btn btn-success btn-sm">
+                                            <i class="fas fa-save"></i> Сохранить 
+                                        </button>
+                                    {% else %}
+                                        <button type="button" class="btn btn-secondary btn-sm" disabled>
+                                            <i class="fas fa-lock"></i> Редактирование недоступно
+                                        </button>
+                                    {% endif %}
+                                {% else %}
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-save"></i> Создать
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+    .badge-status {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        display: inline-block;
+    }
+    .badge-status.draft { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    .badge-status.in_progress { background: #cce5ff; color: #004085; border: 1px solid #007bff; }
+    .badge-status.completed { background: #d4edda; color: #155724; border: 1px solid #28a745; }
+    .badge-status.closed { background: #f8d7da; color: #721c24; border: 1px solid #dc3545; }
+    
+    .card {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .card-header {
+        border-bottom: 2px solid rgba(0,0,0,0.05);
+    }
+    .form-control-sm, .form-select-sm {
+        font-size: 0.875rem;
+    }
+    .form-label {
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+    }
+    .form-group {
+        margin-bottom: 8px;
+    }
+    input[type="file"] {
+        padding: 6px 10px;
+        border: 2px dashed #007bff;
+        background: #f0f8ff;
+        border-radius: 6px;
+        width: 100%;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    input[type="file"]:hover {
+        background: #e3f2fd;
+        border-color: #0056b3;
+    }
+    #scanFileInput {
+        border: 2px dashed #28a745 !important;
+        background: #f0fff0 !important;
+    }
+    #scanFileInput:hover {
+        background: #e0ffe0 !important;
+        border-color: #1e7e34 !important;
+    }
+    .alert {
+        font-size: 0.9rem;
+        padding: 10px 15px;
+        border-radius: 8px;
+    }
+    .alert ul {
+        margin: 5px 0 0 20px;
+    }
+    .badge {
+        font-size: 0.7rem;
+    }
+    .h-100 {
+        height: 100%;
+    }
+    .input-group .btn {
+        border-radius: 0 6px 6px 0;
+    }
+    .btn-sm {
+        padding: 5px 15px;
+        font-size: 0.85rem;
+    }
+    .scan-loading {
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+    .preview-img {
+        max-width: 50px;
+        max-height: 50px;
+        border-radius: 4px;
+        border: 2px solid #28a745;
+        padding: 2px;
+        object-fit: cover;
+    }
+    @keyframes pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script>
+console.log('=== СКРИПТ {{ app_name }} ЗАГРУЖЕН ===');
+
+// Функция предпросмотра изображения
+function previewImage(input, previewId, currentImgId, noImgId) {
+    var preview = document.getElementById(previewId);
+    if (!preview) return;
+    
+    var file = input.files[0];
+    if (file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = preview.querySelector('img');
+            if (img) {
+                img.src = e.target.result;
+            }
+            preview.style.display = 'block';
+            
+            if (currentImgId) {
+                var currentImg = document.getElementById(currentImgId);
+                if (currentImg) currentImg.style.display = 'none';
+            }
+            if (noImgId) {
+                var noImg = document.getElementById(noImgId);
+                if (noImg) noImg.style.display = 'none';
+            }
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+        if (currentImgId) {
+            var currentImg = document.getElementById(currentImgId);
+            if (currentImg) currentImg.style.display = '';
+        }
+        if (noImgId) {
+            var noImg = document.getElementById(noImgId);
+            if (noImg) noImg.style.display = '';
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация предпросмотра для всех изображений (1-8)
+    for (var i = 1; i <= 8; i++) {
+        var imageInput = document.querySelector('#id_image' + i);
+        if (imageInput) {
+            imageInput.addEventListener('change', function() {
+                var fieldName = this.id.replace('id_', '');
+                previewImage(this, 'preview_' + fieldName, 'current_' + fieldName, 'no_' + fieldName);
+            });
+        }
+    }
+
+    // Предпросмотр для фото серийного номера
+    var serialPhotoInput = document.querySelector('#id_serial_photo');
+    if (serialPhotoInput) {
+        serialPhotoInput.addEventListener('change', function() {
+            previewImage(this, 'preview_serial_photo', null, 'no_serial_photo');
+        });
+    }
+});
+
+// Сканирование
+var scanInput = document.getElementById('scanFileInput');
+var scanBtn = document.getElementById('scanSendBtn');
+var scanStatus = document.getElementById('scanStatus');
+var serialInput = document.querySelector('#id_serial_number');
+var enterBtn = document.getElementById('enterBtn');
+var hiddenField = document.getElementById('scanned_photo_base64');
+
+console.log('scanInput:', scanInput);
+console.log('scanBtn:', scanBtn);
+console.log('enterBtn:', enterBtn);
+console.log('hiddenField:', hiddenField);
+
+function scanSend() {
+    var file = scanInput.files[0];
+    if (!file) {
+        scanStatus.style.display = 'block';
+        scanStatus.innerHTML = '<div class="alert alert-warning">Сначала выберите изображение</div>';
+        return;
+    }
+    
+    var formData = new FormData();
+    formData.append('scan_image', file);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    // Добавляем текущий серийный номер если он есть
+    var currentSerial = serialInput ? serialInput.value : '';
+    if (currentSerial) {
+        formData.append('serial_number', currentSerial);
+    }
+    
+    scanStatus.style.display = 'block';
+    scanStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Загрузка и распознавание...</div>';
+    
+    var scanUrl = '{{ scan_url|default:"/" }}{{ namespace }}/scan-serial/';
+    
+    fetch(scanUrl, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(function(response) {
+        if (!response.ok) {
+            return response.text().then(function(text) {
+                throw new Error('Ошибка сервера: ' + response.status);
+            });
+        }
+        return response.json();
+    })
+    .then(function(data) {
+        console.log('Ответ сервера:', data);
+        
+        // Сохраняем фото в скрытое поле
+        if (data.photo_base64) {
+            if (hiddenField) {
+                hiddenField.value = 'data:image/jpeg;base64,' + data.photo_base64;
+                console.log('✅ Фото сохранено в скрытое поле');
+            } else {
+                console.error('❌ hiddenField не найден!');
+            }
+        }
+        
+        if (data.success) {
+            if (data.serial_number) {
+                serialInput.value = data.serial_number;
+                serialInput.style.borderColor = '#28a745';
+                serialInput.style.backgroundColor = '#f0fff0';
+            }
+            
+            // Показываем превью
+            if (data.photo_base64) {
+                var container = document.getElementById('serial-photo-container');
+                if (container) {
+                    var oldPreviews = container.querySelectorAll('.scan-preview');
+                    oldPreviews.forEach(function(el) { el.remove(); });
+                    
+                    var img = document.createElement('img');
+                    img.className = 'scan-preview';
+                    img.src = 'data:image/jpeg;base64,' + data.photo_base64;
+                    img.style.cssText = 'max-width: 150px; max-height: 150px; border-radius: 6px; object-fit: cover; border: 2px solid #28a745; padding: 3px; margin-top: 10px;';
+                    container.appendChild(img);
+                    
+                    var noImg = document.getElementById('no_serial_photo');
+                    if (noImg) noImg.style.display = 'none';
+                }
+            }
+            
+            var message = data.message || 'Найден: <strong>' + data.serial_number + '</strong>';
+            scanStatus.innerHTML = '<div class="alert alert-success">' + message + '</div>';
+            
+            if (data.photo_saved) {
+                scanStatus.innerHTML += '<div class="alert alert-info mt-2">📸 Фото сохранено в объекте</div>';
+            }
+            
+            if (enterBtn) {
+                enterBtn.style.backgroundColor = '#28a745';
+                enterBtn.style.borderColor = '#28a745';
+                enterBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Ввод ✓';
+            }
+        } else {
+            var errorMsg = data.error || 'Не удалось найти серийный номер';
+            var html = '<div class="alert alert-warning">' + errorMsg + '</div>';
+            
+            if (data.photo_saved) {
+                html += '<div class="alert alert-success mt-2">📸 Фото сохранено в объекте</div>';
+            }
+            
+            if (data.temp_object) {
+                html += '<div class="alert alert-info mt-2">Создан временный объект. Отредактируйте серийный номер.</div>';
+            }
+            
+            scanStatus.innerHTML = html;
+        }
+    })
+    .catch(function(error) {
+        console.error('Ошибка:', error);
+        scanStatus.innerHTML = '<div class="alert alert-danger">Ошибка: ' + error.message + '</div>';
+    });
+}
+
+if (scanBtn) {
+    scanBtn.onclick = scanSend;
+    console.log('Обработчик для scanSend привязан');
+}
+
+if (scanInput) {
+    scanInput.onchange = function() {
+        console.log('Файл выбран');
+        if (this.files[0]) {
+            this.style.borderColor = '#17a2b8';
+            this.style.backgroundColor = '#f0f8ff';
+            setTimeout(scanSend, 300);
+        }
+    };
+}
+
+if (serialInput) {
+    serialInput.oninput = function() {
+        this.style.borderColor = '';
+        this.style.backgroundColor = '';
+        if (enterBtn) {
+            enterBtn.style.backgroundColor = '';
+            enterBtn.style.borderColor = '';
+            enterBtn.innerHTML = '<i class="fas fa-arrow-right"></i> Ввод';
+        }
+    };
+}
+
+console.log('=== СКРИПТ {{ app_name }} ГОТОВ ===');
+</script>
+
+<!-- Подключаем AJAX скрипт -->
+{% if namespace == 'gs14' %}
+    <script src="{% static 'gs14/js/ajax_form.js' %}"></script>
+{% elif namespace == 'kt08_9a' %}
+    <script src="{% static 'kt08_9a/js/ajax_form.js' %}"></script>
+{% elif namespace == 'ttr_10ab' %}
+    <script src="{% static 'js/ajax_form.js' %}"></script>
+{% else %}
+    <script src="{% static 'js/ajax_form.js' %}"></script>
+{% endif %}
+
+{% endblock extra_js %}
