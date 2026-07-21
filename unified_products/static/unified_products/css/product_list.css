@@ -1,0 +1,26 @@
+/* Стили для дат */
+input[type="date"] {
+    cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    padding: 5px;
+}
+
+/* Кнопки фильтра */
+.filter-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.filter-actions .btn {
+    flex: 1;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .filter-actions {
+        flex-direction: column;
+    }
+}

@@ -22,12 +22,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views  # Правильный импорт
 from . import views
-app_name = 'pcontrol'
 
 
 urlpatterns = [
-    path('', include('pcontrol_app.urls', namespace='pcontrol')),
-    path('pcontrol/', include('pcontrol_app.urls')),
+    path('', include('pcontrol_app.urls')),
+    #path('pcontrol/', include('pcontrol_app.urls')),
     path('admin/', admin.site.urls),
     #path('', index, name='index'),  # главная страница
     path('gs14/', include('gs14.urls')),
@@ -38,6 +37,8 @@ urlpatterns = [
     ), name='login'),
     path('logout/', custom_logout, name='logout'),
     path('ttr_10ab/', include('ttr_10ab.urls')),
+    path('unified-products/', include('unified_products.urls')),
+    path('scan-serial/', include('unified_products.urls')),  # ✅ Для совместимости
     
     
 

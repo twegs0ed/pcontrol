@@ -4,66 +4,86 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View
 from django.apps import apps
-from .models import ProductPrefix, Application
-import logging
 from django.http import JsonResponse
+from django.utils import timezone
+import logging
+import re
+import base64
+import tempfile
+import os
+from PIL import Image, ImageEnhance
+import pytesseract
+import sys
+
+from .models import ProductPrefix, Application
+from unified_products.models import Category, Product
 
 logger = logging.getLogger(__name__)
 
+# Путь к Tesseract
+if sys.platform == 'win32':
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+elif sys.platform == 'linux':
+    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+elif sys.platform == 'darwin':
+    pytesseract.pytesseract.tesseract_cmd = '/usr/local/bin/tesseract'
+
 
 class MainPageView(LoginRequiredMixin, View):
-    """Главная страница с формой поиска серийного номера (только для авторизованных)"""
+    """Главная страница с формой поиска серийного номера"""
     
-    login_url = '/login/'  # URL для перенаправления неавторизованных
+    login_url = '/login/'
     redirect_field_name = 'next'
     
     def get(self, request):
-        return render(request, 'pcontrol/index.html')
+        # Получаем активные категории для примеров
+        categories = Category.objects.filter(is_active=True)
+        
+        # Статистика
+        total_products = Product.objects.count()
+        total_completed = Product.objects.filter(status='completed').count()
+        total_in_progress = Product.objects.filter(status='in_progress').count()
+        
+        return render(request, 'pcontrol/index.html', {
+            'categories': categories,
+            'total_products': total_products,
+            'total_completed': total_completed,
+            'total_in_progress': total_in_progress,
+        })
     
     def post(self, request):
         serial_number = request.POST.get('serial_number', '').strip()
         
         if not serial_number:
             messages.error(request, 'Введите серийный номер')
-            return redirect('pcontrol:main_page')
+            return redirect('pcontrol:index')
         
-        # Ищем префикс
-        matched_prefix = None
-        prefixes = ProductPrefix.objects.filter(is_active=True).select_related('app').order_by('-prefix')
-        
-        for prefix_data in prefixes:
-            if serial_number.startswith(prefix_data.prefix):
-                matched_prefix = prefix_data
+        # Ищем категорию по префиксу
+        category = None
+        categories = Category.objects.filter(is_active=True)
+        for cat in categories:
+            if serial_number.startswith(cat.prefix):
+                category = cat
                 break
         
-        if matched_prefix:
-            return self.process_with_prefix(request, serial_number, matched_prefix)
+        if category:
+            return self.process_with_category(request, serial_number, category)
         else:
-            return self.search_in_all_apps(request, serial_number)
+            messages.error(request, f'Не найдена категория для серийного номера {serial_number}')
+            return redirect('pcontrol:index')
     
-    def process_with_prefix(self, request, serial_number, prefix):
-        """Обработка найденного префикса"""
+    def process_with_category(self, request, serial_number, category):
+        """Обработка найденной категории"""
         try:
-            model = prefix.get_model()
-            if not model:
-                messages.error(request, f'Модель для приложения {prefix.app.app_label} не найдена')
-                return redirect('pcontrol:main_page')
-            
+            # Пытаемся найти объект
             try:
-                # Пытаемся найти объект
-                obj = model.objects.get(serial_number=serial_number)
-                
-                # ===== ПРОВЕРКА ВЛАДЕЛЬЦА =====
+                obj = Product.objects.get(serial_number=serial_number)
                 owner = getattr(obj, 'owner', None)
                 
-                # Если объект принадлежит другому пользователю
+                # Проверка владельца
                 if owner and owner != request.user:
                     owner_full_name = owner.get_full_name() or owner.username
-                    
-                    # Проверяем, является ли владелец контролером
-                    is_controller = owner.groups.filter(name='Контролер').exists()
-                    
-                    if is_controller:
+                    if owner.groups.filter(name='Контролер').exists():
                         messages.error(
                             request,
                             f'⛔ ДОСТУП ЗАПРЕЩЕН! Объект с серийным номером {serial_number} '
@@ -72,7 +92,7 @@ class MainPageView(LoginRequiredMixin, View):
                         return render(request, 'pcontrol/access_denied.html', {
                             'serial_number': serial_number,
                             'owner_name': owner_full_name,
-                            'product_name': prefix.product_name,
+                            'product_name': category.name,
                         })
                     else:
                         messages.info(
@@ -80,211 +100,60 @@ class MainPageView(LoginRequiredMixin, View):
                             f'ℹ️ Объект с серийным номером {serial_number} найден. '
                             f'Владелец: {owner_full_name}'
                         )
-                        edit_url = prefix.get_edit_url(serial_number)
-                        if edit_url:
-                            return redirect(edit_url)
-                        return redirect('pcontrol:main_page')
+                        return redirect('unified_products:product_detail', pk=obj.pk)
                 
                 # Если объект принадлежит текущему пользователю
                 messages.info(
                     request, 
-                    f'ℹ️ Объект {prefix.product_name} с серийным номером {serial_number} найден.'
+                    f'ℹ️ Объект {category.name} с серийным номером {serial_number} найден.'
                 )
                 
-                edit_url = prefix.get_edit_url(serial_number)
-                if edit_url:
-                    return redirect(edit_url)
-                else:
-                    messages.error(request, f'Не удалось определить URL для редактирования {prefix.product_name}')
-                    return redirect('pcontrol:main_page')
-                    
-            except model.DoesNotExist:
-                # Объект не найден
-                if not request.user.is_authenticated:
-                    messages.warning(
-                        request, 
-                        f'⚠️ Объект с серийным номером {serial_number} не найден. '
-                        f'Для создания нового объекта необходимо авторизоваться.'
-                    )
-                    return redirect('pcontrol:main_page')
+                # Проверяем статус
+                if obj.status in ['completed', 'closed']:
+                    return redirect('unified_products:product_detail', pk=obj.pk)
                 
-                is_allowed = (
-                    request.user.is_superuser or 
-                    request.user.groups.filter(name='Контролер').exists()
-                )
+                return redirect('unified_products:product_edit', serial_number=serial_number)
                 
-                if not is_allowed:
-                    messages.warning(
-                        request, 
-                        f'⚠️ Объект с серийным номером {serial_number} не найден. '
-                        f'Для создания нового объекта необходимо быть в группе "Контролер".'
-                    )
-                    return redirect('pcontrol:main_page')
-                
-                return self.create_and_redirect(request, serial_number, prefix)
+            except Product.DoesNotExist:
+                # Объект не найден - создаем новый
+                return self.create_and_redirect(request, serial_number, category)
                     
         except Exception as e:
-            logger.error(f"Ошибка обработки префикса: {e}")
+            logger.error(f"Ошибка обработки: {e}")
             messages.error(request, f'❌ Ошибка: {str(e)}')
-            return redirect('pcontrol:main_page')
+            return redirect('pcontrol:index')
     
-    def create_and_redirect(self, request, serial_number, prefix):
+    def create_and_redirect(self, request, serial_number, category):
         """Создать объект и перенаправить на редактирование"""
         try:
-            model = prefix.get_model()
-            if not model:
-                messages.error(request, f'Модель для приложения {prefix.app.app_label} не найдена')
-                return redirect('pcontrol:main_page')
+            # Проверяем права
+            if not request.user.is_superuser and not request.user.groups.filter(name='Контролер').exists():
+                messages.error(request, 'У вас нет прав для создания объектов')
+                return redirect('pcontrol:index')
             
-            existing_obj = model.objects.filter(serial_number=serial_number).first()
-            if existing_obj:
-                owner = getattr(existing_obj, 'owner', None)
-                if owner and owner != request.user:
-                    owner_full_name = owner.get_full_name() or owner.username
-                    if owner.groups.filter(name='Контролер').exists():
-                        return render(request, 'pcontrol/access_denied.html', {
-                            'serial_number': serial_number,
-                            'owner_name': owner_full_name,
-                            'product_name': prefix.product_name,
-                        })
-                    else:
-                        messages.warning(
-                            request,
-                            f'⚠️ Объект с серийным номером {serial_number} уже существует и принадлежит '
-                            f'пользователю {owner_full_name}.'
-                        )
-                        edit_url = prefix.get_edit_url(serial_number)
-                        if edit_url:
-                            return redirect(edit_url)
-                        return redirect('pcontrol:main_page')
-                else:
-                    messages.info(request, f'ℹ️ Объект с серийным номером {serial_number} уже существует')
-                    edit_url = prefix.get_edit_url(serial_number)
-                    if edit_url:
-                        return redirect(edit_url)
-                    return redirect('pcontrol:main_page')
-            
-            create_kwargs = {
-                'serial_number': serial_number,
-            }
-            
-            if hasattr(model, 'status'):
-                create_kwargs['status'] = 'draft'
-            
-            if hasattr(model, 'owner'):
-                create_kwargs['owner'] = request.user
-            
-            obj = model.objects.create(**create_kwargs)
+            # Создаем объект
+            obj = Product.objects.create(
+                serial_number=serial_number,
+                category=category,
+                owner=request.user,
+                status='draft'
+            )
             
             messages.success(
                 request, 
-                f'✅ Создан новый объект "{prefix.product_name}" с серийным номером {serial_number}'
+                f'✅ Создан новый объект "{category.name}" с серийным номером {serial_number}'
             )
             
-            edit_url = prefix.get_edit_url(serial_number)
-            if edit_url:
-                return redirect(edit_url)
-            
-            messages.error(request, '❌ Не удалось определить URL для редактирования')
-            return redirect('pcontrol:main_page')
+            return redirect('unified_products:product_edit', serial_number=serial_number)
             
         except Exception as e:
             logger.error(f"Ошибка создания объекта: {e}")
             messages.error(request, f'❌ Ошибка создания объекта: {str(e)}')
-            return redirect('pcontrol:main_page')
-    
-    def search_in_all_apps(self, request, serial_number):
-        """Поиск во всех зарегистрированных моделях"""
-        prefixes = ProductPrefix.objects.filter(is_active=True).select_related('app')
-        
-        models_to_check = {}
-        for prefix in prefixes:
-            model = prefix.get_model()
-            app_label = prefix.app.app_label
-            if model and app_label not in models_to_check:
-                models_to_check[app_label] = {
-                    'model': model,
-                    'prefixes': []
-                }
-            if model:
-                models_to_check[app_label]['prefixes'].append(prefix)
-        
-        for app_label, data in models_to_check.items():
-            model = data['model']
-            try:
-                obj = model.objects.get(serial_number=serial_number)
-                
-                owner = getattr(obj, 'owner', None)
-                
-                if owner and owner != request.user:
-                    owner_full_name = owner.get_full_name() or owner.username
-                    
-                    if owner.groups.filter(name='Контролер').exists():
-                        product_name = 'Изделие'
-                        for prefix in data['prefixes']:
-                            if serial_number.startswith(prefix.prefix):
-                                product_name = prefix.product_name
-                                break
-                        
-                        return render(request, 'pcontrol/access_denied.html', {
-                            'serial_number': serial_number,
-                            'owner_name': owner_full_name,
-                            'product_name': product_name,
-                        })
-                    else:
-                        messages.info(
-                            request,
-                            f'ℹ️ Объект с серийным номером {serial_number} найден. '
-                            f'Владелец: {owner_full_name}'
-                        )
-                
-                messages.info(request, f'ℹ️ Объект найден в приложении {app_label}')
-                
-                for prefix in data['prefixes']:
-                    if serial_number.startswith(prefix.prefix):
-                        edit_url = prefix.get_edit_url(serial_number)
-                        if edit_url:
-                            return redirect(edit_url)
-                
-                try:
-                    from django.urls import reverse
-                    return redirect(f'{app_label}:edit', serial_number=serial_number)
-                except:
-                    messages.error(request, f'Не удалось определить URL для редактирования')
-                    return redirect('pcontrol:main_page')
-                    
-            except model.DoesNotExist:
-                continue
-            except Exception as e:
-                logger.error(f"Ошибка поиска в модели {app_label}: {e}")
-                continue
-        
-        if not request.user.is_authenticated:
-            messages.warning(
-                request, 
-                f'⚠️ Серийный номер {serial_number} не найден. '
-                f'Для создания нового объекта необходимо авторизоваться.'
-            )
-            return redirect('pcontrol:main_page')
-        
-        is_allowed = (
-            request.user.is_superuser or 
-            request.user.groups.filter(name='Контролер').exists()
-        )
-        
-        if not is_allowed:
-            messages.warning(
-                request, 
-                f'⚠️ Серийный номер {serial_number} не найден. '
-                f'Для создания нового объекта необходимо быть в группе "Контролер".'
-            )
-            return redirect('pcontrol:main_page')
-        
-        return redirect('pcontrol:unknown', serial_number=serial_number)
+            return redirect('pcontrol:index')
 
 
 class CheckSerialAjaxView(LoginRequiredMixin, View):
-    """AJAX проверка серийного номера (только для авторизованных)"""
+    """AJAX проверка серийного номера"""
     
     login_url = '/login/'
     redirect_field_name = 'next'
@@ -298,97 +167,70 @@ class CheckSerialAjaxView(LoginRequiredMixin, View):
                 'error': 'Введите серийный номер'
             })
         
-        # ОТЛАДКА
-        print(f"\n=== AJAX ПРОВЕРКА ===")
-        print(f"Пользователь: {request.user} (ID: {request.user.id})")
-        print(f"Серийный номер: {serial_number}")
-        
-        # Ищем префикс
-        matched_prefix = None
-        prefixes = ProductPrefix.objects.filter(is_active=True).select_related('app').order_by('-prefix')
-        
-        for prefix_data in prefixes:
-            if serial_number.startswith(prefix_data.prefix):
-                matched_prefix = prefix_data
+        # Ищем категорию по префиксу
+        category = None
+        categories = Category.objects.filter(is_active=True)
+        for cat in categories:
+            if serial_number.startswith(cat.prefix):
+                category = cat
                 break
         
-        if not matched_prefix:
+        if not category:
             return JsonResponse({
                 'success': False,
-                'found': False,
-                'message': 'Префикс не найден в системе'
-            })
-        
-        print(f"Найден префикс: {matched_prefix.prefix} - {matched_prefix.product_name}")
-        
-        # Ищем объект
-        model = matched_prefix.get_model()
-        if not model:
-            return JsonResponse({
-                'success': False,
-                'found': False,
-                'message': 'Модель не найдена'
+                'error': 'Категория для этого номера не найдена',
+                'found': False
             })
         
         try:
-            obj = model.objects.get(serial_number=serial_number)
+            obj = Product.objects.get(serial_number=serial_number)
             owner = getattr(obj, 'owner', None)
-            
-            print(f"Объект найден: {obj}")
-            print(f"Владелец объекта: {owner} (ID: {owner.id if owner else None})")
-            print(f"Текущий пользователь: {request.user} (ID: {request.user.id})")
-            print(f"Совпадают ли пользователи: {owner == request.user if owner else False}")
-            
-            # ===== ПРОВЕРКА СТАТУСА =====
             status = getattr(obj, 'status', None)
             is_completed = status in ['completed', 'closed'] if status else False
+            progress = obj.get_progress_percent() if hasattr(obj, 'get_progress_percent') else 0
             
-            # Если объект завершен - запрещаем редактирование
+            # ===== ОБЪЕКТ ЗАВЕРШЕН =====
             if is_completed:
                 owner_name = owner.get_full_name() or owner.username if owner else 'Неизвестно'
                 return JsonResponse({
                     'success': True,
                     'found': True,
                     'blocked': True,
-                    'owner_name': owner_name,
-                    'product_name': matched_prefix.product_name,
                     'is_completed': True,
                     'status': status,
+                    'category_name': category.name,
+                    'owner_name': owner_name,
                     'message': f'Объект завершен (статус: {status})'
                 })
             
-            # ===== ПРОВЕРКА ВЛАДЕЛЬЦА =====
-            # Если объект принадлежит текущему пользователю - разрешаем редактирование
+            # ===== ОБЪЕКТ ПРИНАДЛЕЖИТ ТЕКУЩЕМУ ПОЛЬЗОВАТЕЛЮ =====
             if owner and owner == request.user:
-                print("=== ОБЪЕКТ ПРИНАДЛЕЖИТ ТЕКУЩЕМУ ПОЛЬЗОВАТЕЛЮ ===")
                 return JsonResponse({
                     'success': True,
                     'found': True,
                     'blocked': False,
                     'can_edit': True,
                     'owner': owner.get_full_name() or owner.username,
-                    'product': matched_prefix.product_name,
+                    'category_name': category.name,
                     'is_completed': False,
                     'status': status,
+                    'progress': progress,
                     'message': 'Объект принадлежит вам'
                 })
             
-            # Если объект принадлежит другому пользователю
+            # ===== ОБЪЕКТ ПРИНАДЛЕЖИТ ДРУГОМУ ПОЛЬЗОВАТЕЛЮ =====
             if owner and owner != request.user:
                 owner_full_name = owner.get_full_name() or owner.username
                 is_controller = owner.groups.filter(name='Контролер').exists()
-                
-                print(f"Объект принадлежит другому пользователю: {owner_full_name}")
-                print(f"Владелец - контролер: {is_controller}")
                 
                 if is_controller:
                     return JsonResponse({
                         'success': True,
                         'found': True,
                         'blocked': True,
-                        'owner_name': owner_full_name,
-                        'product_name': matched_prefix.product_name,
                         'is_completed': False,
+                        'owner_name': owner_full_name,
+                        'category_name': category.name,
                         'message': f'Объект занят контролером {owner_full_name}'
                     })
                 else:
@@ -398,40 +240,33 @@ class CheckSerialAjaxView(LoginRequiredMixin, View):
                         'blocked': False,
                         'can_edit': False,
                         'owner': owner_full_name,
-                        'product': matched_prefix.product_name,
+                        'category_name': category.name,
                         'is_completed': False,
                         'message': f'Объект принадлежит {owner_full_name}'
                     })
             
-            # ===== ОБЪЕКТ БЕЗ ВЛАДЕЛЬЦА (свободен) =====
-            print("=== ОБЪЕКТ БЕЗ ВЛАДЕЛЬЦА ===")
-            can_edit = False
-            if request.user.is_superuser:
-                can_edit = True
-            elif request.user.groups.filter(name='Контролер').exists():
-                can_edit = True
-            
+            # ===== ОБЪЕКТ БЕЗ ВЛАДЕЛЬЦА =====
+            can_edit = request.user.is_superuser or request.user.groups.filter(name='Контролер').exists()
             return JsonResponse({
                 'success': True,
                 'found': True,
                 'blocked': False,
                 'can_edit': can_edit,
                 'owner': None,
-                'product': matched_prefix.product_name,
+                'category_name': category.name,
                 'is_completed': False,
                 'status': status,
+                'progress': progress,
             })
             
-        except model.DoesNotExist:
-            print("=== ОБЪЕКТ НЕ НАЙДЕН ===")
+        except Product.DoesNotExist:
             return JsonResponse({
                 'success': True,
                 'found': False,
-                'product': matched_prefix.product_name,
+                'category_name': category.name,
                 'message': 'Объект не найден, будет создан новый'
             })
         except Exception as e:
-            print(f"ОШИБКА: {e}")
             logger.error(f"Ошибка проверки: {e}")
             return JsonResponse({
                 'success': False,
@@ -439,8 +274,106 @@ class CheckSerialAjaxView(LoginRequiredMixin, View):
             })
 
 
+class ScanSerialView(LoginRequiredMixin, View):
+    """Сканирование серийного номера с камеры"""
+    
+    login_url = '/login/'
+    redirect_field_name = 'next'
+    
+    def post(self, request):
+        try:
+            if 'scan_image' not in request.FILES:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Файл не выбран'
+                }, status=400)
+            
+            file = request.FILES['scan_image']
+            
+            if file.size > 10 * 1024 * 1024:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Файл слишком большой (максимум 10MB)'
+                }, status=400)
+            
+            # Сохраняем во временный файл
+            temp_path = tempfile.mktemp(suffix='.jpg')
+            with open(temp_path, 'wb+') as destination:
+                for chunk in file.chunks():
+                    destination.write(chunk)
+            
+            # Распознаем серийный номер
+            detected_serial = None
+            try:
+                image = Image.open(temp_path)
+                image = image.convert('L')
+                enhancer = ImageEnhance.Contrast(image)
+                image = enhancer.enhance(2.0)
+                image = image.point(lambda p: 255 if p > 128 else 0)
+                width, height = image.size
+                image = image.resize((width * 3, height * 3), Image.Resampling.LANCZOS)
+                
+                configs = [
+                    r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789',
+                    r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789',
+                    r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789',
+                ]
+                
+                for config in configs:
+                    text = pytesseract.image_to_string(image, lang='eng', config=config)
+                    text = re.sub(r'[^0-9]', '', text)
+                    if text:
+                        match = re.search(r'\d{6,8}', text)
+                        if match:
+                            detected_serial = match.group(0)
+                            break
+            except Exception as e:
+                logger.error(f"Ошибка распознавания: {e}")
+            
+            # Кодируем фото в base64
+            with open(temp_path, 'rb') as f:
+                photo_base64 = base64.b64encode(f.read()).decode('utf-8')
+            
+            # Удаляем временный файл
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+            
+            if detected_serial:
+                # Определяем категорию по префиксу
+                category = None
+                categories = Category.objects.filter(is_active=True)
+                for cat in categories:
+                    if detected_serial.startswith(cat.prefix):
+                        category = cat
+                        break
+                
+                return JsonResponse({
+                    'success': True,
+                    'serial_number': detected_serial,
+                    'photo_base64': photo_base64,
+                    'category_id': category.id if category else None,
+                    'category_name': category.name if category else None,
+                    'message': f'Распознан номер: {detected_serial}'
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'photo_base64': photo_base64,
+                    'error': 'Не удалось распознать серийный номер'
+                }, status=400)
+                
+        except Exception as e:
+            logger.error(f"Ошибка сканирования: {e}", exc_info=True)
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+
 class AccessDeniedView(LoginRequiredMixin, View):
-    """Страница с информацией о запрете доступа (только для авторизованных)"""
+    """Страница с информацией о запрете доступа"""
     
     login_url = '/login/'
     redirect_field_name = 'next'
@@ -450,20 +383,12 @@ class AccessDeniedView(LoginRequiredMixin, View):
         product_name = 'Изделие'
         
         try:
-            prefixes = ProductPrefix.objects.filter(is_active=True).select_related('app')
-            for prefix in prefixes:
-                model = prefix.get_model()
-                if model:
-                    try:
-                        obj = model.objects.get(serial_number=serial_number)
-                        owner = getattr(obj, 'owner', None)
-                        if owner:
-                            owner_name = owner.get_full_name() or owner.username
-                            product_name = prefix.product_name
-                        break
-                    except:
-                        continue
-        except:
+            product = Product.objects.get(serial_number=serial_number)
+            owner = getattr(product, 'owner', None)
+            if owner:
+                owner_name = owner.get_full_name() or owner.username
+                product_name = product.category.name if product.category else 'Изделие'
+        except Product.DoesNotExist:
             pass
         
         return render(request, 'pcontrol/access_denied.html', {
@@ -471,230 +396,3 @@ class AccessDeniedView(LoginRequiredMixin, View):
             'owner_name': owner_name,
             'product_name': product_name,
         })
-
-
-class ObjectDetailView(LoginRequiredMixin, View):
-    """Универсальная страница просмотра объекта (только для авторизованных)"""
-    
-    login_url = '/login/'
-    redirect_field_name = 'next'
-    
-    def get(self, request, serial_number):
-        owner_name = 'Неизвестный контролер'
-        product_name = 'Изделие'
-        fields = {}
-        created_at = None
-        updated_at = None
-        status = None
-        status_display = None
-        is_completed = False
-        
-        # Ищем объект во всех моделях
-        prefixes = ProductPrefix.objects.filter(is_active=True).select_related('app')
-        
-        for prefix in prefixes:
-            model = prefix.get_model()
-            if model:
-                try:
-                    obj = model.objects.get(serial_number=serial_number)
-                    owner = getattr(obj, 'owner', None)
-                    
-                    if owner:
-                        owner_name = owner.get_full_name() or owner.username
-                    product_name = prefix.product_name
-                    
-                    # Получаем статус
-                    if hasattr(obj, 'status'):
-                        status = obj.status
-                        status_display = obj.get_status_display() if hasattr(obj, 'get_status_display') else obj.status
-                        is_completed = status in ['completed', 'closed']
-                    
-                    # Получаем даты
-                    if hasattr(obj, 'created_at'):
-                        created_at = obj.created_at
-                    if hasattr(obj, 'updated_at'):
-                        updated_at = obj.updated_at
-                    
-                    # Получаем все поля объекта для отображения
-                    for field in model._meta.fields:
-                        field_name = field.name
-                        if field_name in ['id', 'owner', 'serial_number', 'created_at', 'updated_at']:
-                            continue
-                        
-                        value = getattr(obj, field_name, None)
-                        if value and not callable(value):
-                            if isinstance(value, str) and value.strip():
-                                fields[field.verbose_name] = value
-                            elif not isinstance(value, str):
-                                fields[field.verbose_name] = value
-                    
-                    break
-                except:
-                    continue
-        
-        return render(request, 'pcontrol/object_detail.html', {
-            'serial_number': serial_number,
-            'owner_name': owner_name,
-            'product_name': product_name,
-            'fields': fields,
-            'created_at': created_at,
-            'updated_at': updated_at,
-            'status': status,
-            'status_display': status_display,
-            'is_completed': is_completed,
-        })
-
-
-class UnknownSerialView(LoginRequiredMixin, View):
-    """Страница для неизвестного серийного номера (только для авторизованных)"""
-    
-    login_url = '/login/'
-    redirect_field_name = 'next'
-    
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            messages.error(request, '⚠️ Для доступа необходимо авторизоваться.')
-            return redirect('pcontrol:main_page')
-        
-        is_allowed = (
-            request.user.is_superuser or 
-            request.user.groups.filter(name='Контролер').exists()
-        )
-        
-        if not is_allowed:
-            messages.error(
-                request, 
-                '⛔ У вас нет прав для создания объектов. '
-                'Только суперпользователи и контролеры могут создавать объекты.'
-            )
-            return redirect('pcontrol:main_page')
-        
-        return super().dispatch(request, *args, **kwargs)
-    
-    def get(self, request, serial_number):
-        matched_prefix = None
-        prefixes = ProductPrefix.objects.filter(is_active=True).select_related('app').order_by('-prefix')
-        
-        for prefix_data in prefixes:
-            if serial_number.startswith(prefix_data.prefix):
-                matched_prefix = prefix_data
-                break
-        
-        if matched_prefix:
-            return self.create_and_redirect(request, serial_number, matched_prefix)
-        
-        available_prefixes = ProductPrefix.objects.filter(is_active=True).select_related('app').values(
-            'app__app_label',
-            'app__app_name',
-            'product_name', 
-            'model_name',
-            'prefix'
-        ).distinct().order_by('app__app_name', 'product_name')
-        
-        available_apps = []
-        for item in available_prefixes:
-            available_apps.append({
-                'app_label': item['app__app_label'],
-                'app_name': item['app__app_name'],
-                'product_name': item['product_name'],
-                'model_name': item['model_name'],
-                'prefix': item['prefix']
-            })
-        
-        user_groups = [g.name for g in request.user.groups.all()]
-        
-        return render(request, 'pcontrol/unknown.html', {
-            'serial_number': serial_number,
-            'available_apps': available_apps,
-            'is_admin': request.user.is_superuser,
-            'is_controller': 'Контролер' in user_groups,
-            'is_auditor': 'Аудитор' in user_groups,
-            'has_prefix': False,
-            'user_groups': user_groups,
-        })
-    
-    def create_and_redirect(self, request, serial_number, prefix):
-        try:
-            model = prefix.get_model()
-            if not model:
-                messages.error(request, f'Модель для приложения {prefix.app.app_label} не найдена')
-                return redirect('pcontrol:main_page')
-            
-            existing_obj = model.objects.filter(serial_number=serial_number).first()
-            if existing_obj:
-                owner = getattr(existing_obj, 'owner', None)
-                if owner and owner != request.user:
-                    owner_full_name = owner.get_full_name() or owner.username
-                    if owner.groups.filter(name='Контролер').exists():
-                        return render(request, 'pcontrol/access_denied.html', {
-                            'serial_number': serial_number,
-                            'owner_name': owner_full_name,
-                            'product_name': prefix.product_name,
-                        })
-                    else:
-                        messages.warning(
-                            request,
-                            f'⚠️ Объект с серийным номером {serial_number} уже существует и принадлежит '
-                            f'пользователю {owner_full_name}.'
-                        )
-                else:
-                    messages.info(request, f'ℹ️ Объект с серийным номером {serial_number} уже существует')
-                
-                edit_url = prefix.get_edit_url(serial_number)
-                if edit_url:
-                    return redirect(edit_url)
-                return redirect('pcontrol:main_page')
-            
-            create_kwargs = {
-                'serial_number': serial_number,
-            }
-            
-            if hasattr(model, 'status'):
-                create_kwargs['status'] = 'draft'
-            
-            if hasattr(model, 'owner'):
-                create_kwargs['owner'] = request.user
-            
-            obj = model.objects.create(**create_kwargs)
-            
-            messages.success(
-                request, 
-                f'✅ Создан новый объект "{prefix.product_name}" с серийным номером {serial_number}'
-            )
-            
-            edit_url = prefix.get_edit_url(serial_number)
-            if edit_url:
-                return redirect(edit_url)
-            
-            messages.error(request, '❌ Не удалось определить URL для редактирования')
-            return redirect('pcontrol:main_page')
-            
-        except Exception as e:
-            logger.error(f"Ошибка создания объекта: {e}")
-            messages.error(request, f'❌ Ошибка создания объекта: {str(e)}')
-            return redirect('pcontrol:main_page')
-    
-    def post(self, request, serial_number):
-        app_label = request.POST.get('app_label')
-        
-        if not app_label:
-            messages.error(request, '❌ Выберите тип изделия')
-            return redirect('pcontrol:unknown', serial_number=serial_number)
-        
-        try:
-            app = Application.objects.get(app_label=app_label)
-            prefix = ProductPrefix.objects.filter(app=app, is_active=True).first()
-            
-            if not prefix:
-                messages.error(request, f'❌ Приложение {app_label} не зарегистрировано')
-                return redirect('pcontrol:unknown', serial_number=serial_number)
-            
-            return self.create_and_redirect(request, serial_number, prefix)
-            
-        except Application.DoesNotExist:
-            messages.error(request, f'❌ Приложение "{app_label}" не найдено')
-            return redirect('pcontrol:unknown', serial_number=serial_number)
-        except Exception as e:
-            logger.error(f"Ошибка создания объекта: {e}")
-            messages.error(request, f'❌ Ошибка создания объекта: {str(e)}')
-            return redirect('pcontrol:unknown', serial_number=serial_number)

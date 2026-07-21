@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-check-circle"></i> Закрытие изделия
+                    </h4>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-lock fa-4x text-success mb-3"></i>
+                    <h5>Вы уверены, что хотите закрыть изделие?</h5>
+                    <p>
+                        <strong>{{ product.serial_number }}</strong><br>
+                        <span class="text-muted">{{ product.category.name }}</span>
+                    </p>
+                    <p class="text-warning small">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        После закрытия редактирование будет недоступно!
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-center gap-3">
+                            <a href="{% url namespace|default:'unified_products'|add:':product_detail' product.pk %}" 
+                               class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Отмена
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-check"></i> Закрыть
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

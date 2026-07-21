@@ -8,7 +8,9 @@
         <div class="col-md-8 col-lg-6">
             <div class="card shadow">
                 <div class="card-body p-5">
-                    <h1 class="text-center mb-4">Поиск изделия</h1>
+                    <h1 class="text-center mb-4">
+                        <i class="fas fa-search"></i> Поиск изделия
+                    </h1>
                     
                     <!-- ===== БЛОК ДЛЯ СООБЩЕНИЙ ===== -->
                     {% if messages %}
@@ -55,17 +57,35 @@
                             </button>
                         </div>
                         
-                        <!-- ПРИМЕРЫ -->
-                        <div class="examples">
-                            <small class="text-muted"></small>
-                            {% for prefix in prefixes %}
+                        <!-- ПРИМЕРЫ (из активных категорий) -->
+                        <div class="examples text-center">
+                            <small class="text-muted d-block mb-2">Примеры серийных номеров:</small>
+                            {% for category in categories %}
                                 <span class="example-badge badge bg-secondary" 
-                                      data-serial="{{ prefix.prefix }}12345">
-                                    {{ prefix.prefix }}...
+                                      data-serial="{{ category.prefix }}12345">
+                                    {{ category.prefix }}... ({{ category.name }})
                                 </span>
+                            {% empty %}
+                                <span class="text-muted">Нет активных категорий</span>
                             {% endfor %}
                         </div>
                     </form>
+                    
+                    <!-- ===== СТАТИСТИКА ===== -->
+                    {% if total_products > 0 %}
+                        <div class="mt-4 text-center text-muted small">
+                            <i class="fas fa-database"></i> 
+                            Всего изделий: {{ total_products }}
+                            {% if total_completed > 0 %}
+                                | <i class="fas fa-check-circle text-success"></i> 
+                                Завершено: {{ total_completed }}
+                            {% endif %}
+                            {% if total_in_progress > 0 %}
+                                | <i class="fas fa-spinner text-primary"></i> 
+                                В процессе: {{ total_in_progress }}
+                            {% endif %}
+                        </div>
+                    {% endif %}
                     
                 </div>
             </div>

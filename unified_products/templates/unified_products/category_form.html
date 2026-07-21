@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header {% if header_color %}{{ header_color }}{% else %}bg-primary{% endif %} text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-tag"></i> 
+                        {% if is_create %}Создание категории{% else %}Редактирование категории: {{ object.name }}{% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Ошибки формы -->
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle"></i>
+                                Пожалуйста, исправьте ошибки ниже:
+                                <ul class="mb-0">
+                                    {% for field in form %}
+                                        {% for error in field.errors %}
+                                            <li>{{ field.label }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                    {% for error in form.non_field_errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Поле: Название категории -->
+                        <div class="mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">
+                                <i class="fas fa-font"></i> Название категории <span class="text-danger">*</span>
+                            </label>
+                            {{ form.name }}
+                            <div class="form-text">Например: GS14, KT08_9a, TTR-10AB</div>
+                        </div>
+                        
+                        <!-- Поле: Префикс -->
+                        <div class="mb-3">
+                            <label for="{{ form.prefix.id_for_label }}" class="form-label">
+                                <i class="fas fa-hashtag"></i> Префикс серийного номера <span class="text-danger">*</span>
+                            </label>
+                            {{ form.prefix }}
+                            <div class="form-text">Первые цифры серийного номера, например: 123, 4567</div>
+                        </div>
+                        
+                        <!-- Поле: Количество изображений -->
+                        <div class="mb-3">
+                            <label for="{{ form.image_count.id_for_label }}" class="form-label">
+                                <i class="fas fa-images"></i> Количество изображений <span class="text-danger">*</span>
+                            </label>
+                            {{ form.image_count }}
+                            <div class="form-text">Сколько фотографий нужно загрузить для изделия (от 1 до 20)</div>
+                        </div>
+                        
+                        <!-- Поле: Активна -->
+                        <div class="mb-3 form-check">
+                            {{ form.is_active }}
+                            <label for="{{ form.is_active.id_for_label }}" class="form-check-label">
+                                <i class="fas fa-check-circle"></i> Активна
+                            </label>
+                            <div class="form-text">Неактивные категории не отображаются в поиске</div>
+                        </div>
+                        
+                        <!-- Кнопки -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'unified_products:category_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Назад
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 
+                                {% if is_create %}Создать{% else %}Сохранить{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

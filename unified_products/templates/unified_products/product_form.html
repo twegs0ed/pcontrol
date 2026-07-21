@@ -1,0 +1,315 @@
+<!-- unified_products/templates/unified_products/product_form.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'unified_products/css/product_form.css' %}">
+<style>
+    .sample-btn {
+        flex-shrink: 0;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        font-size: 13px;
+        transition: all 0.3s;
+    }
+    .sample-btn:hover {
+        transform: scale(1.1);
+    }
+    .sample-modal-image {
+        max-height: 70vh;
+        max-width: 100%;
+        object-fit: contain;
+        border-radius: 8px;
+    }
+    .sample-modal-info {
+        background: #f8f9fa;
+        padding: 12px 15px;
+        border-radius: 6px;
+        font-size: 14px;
+        margin-top: 15px;
+    }
+    .sample-modal-info p {
+        margin-bottom: 4px;
+    }
+    .sample-modal-info p:last-child {
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header {% if header_color %}{{ header_color }}{% else %}bg-primary{% endif %} text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-microchip"></i> 
+                            {% if is_create %}Создание изделия{% else %}Редактирование: {{ object.serial_number }}{% endif %}
+                        </h4>
+                        <div>
+                            <span class="badge 
+                                {% if object.status == 'draft' %}bg-secondary
+                                {% elif object.status == 'in_progress' %}bg-primary
+                                {% elif object.status == 'completed' %}bg-success
+                                {% elif object.status == 'closed' %}bg-dark
+                                {% endif %}">
+                                {{ object.get_status_display }}
+                            </span>
+                            {% if object.is_sample %}
+                                <span class="badge bg-warning text-dark ms-1">
+                                    <i class="fas fa-star"></i> Образец
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- ===== ПРОГРЕСС ===== -->
+                    {% if not is_create %}
+                    <div class="progress-container">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Прогресс заполнения</span>
+                            <span id="progressText">{{ object.get_filled_count }}/{{ object.get_total_required }}</span>
+                        </div>
+                        <div class="progress">
+                            <div id="progressBar" 
+                                 class="progress-bar {% if object.is_completed %}bg-success{% else %}bg-warning{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {{ object.get_progress_percent }}%;"
+                                 aria-valuenow="{{ object.get_progress_percent }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                {{ object.get_progress_percent }}%
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- ===== ОСНОВНАЯ ФОРМА ===== -->
+                    <form method="post" enctype="multipart/form-data" novalidate id="productForm">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <!-- Левая колонка -->
+                            <div class="col-md-4">
+                                <!-- Серийный номер -->
+                                <div class="mb-3">
+                                    <label for="{{ form.serial_number.id_for_label }}" class="form-label">
+                                        <i class="fas fa-hashtag"></i> Серийный номер <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.serial_number }}
+                                        <button type="button" class="btn btn-outline-secondary" id="scanSerialBtn">
+                                            <i class="fas fa-camera scan-icon"></i>
+                                            <i class="fas fa-spinner fa-spin spinner" style="display:none;"></i>
+                                        </button>
+                                    </div>
+                                    <div id="categoryDetectResult" class="category-detect-result mt-2" style="display: none;">
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle"></i>
+                                            Категория: <strong id="detectedCategoryName"></strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Категория -->
+                                <div class="mb-3" id="categoryField">
+                                    <label for="{{ form.category.id_for_label }}" class="form-label">
+                                        <i class="fas fa-tag"></i> Категория
+                                    </label>
+                                    {{ form.category }}
+                                    <div class="field-help">Категория определяется автоматически по префиксу</div>
+                                </div>
+                                
+                                <!-- Описание -->
+                                <div class="mb-3">
+                                    <label for="{{ form.description.id_for_label }}" class="form-label">
+                                        <i class="fas fa-align-left"></i> Описание
+                                    </label>
+                                    {{ form.description }}
+                                </div>
+                                
+                                <!-- Фото серийного номера -->
+                                <div class="mb-3">
+                                    <label for="{{ form.serial_photo.id_for_label }}" class="form-label">
+                                        <i class="fas fa-image"></i> Фото серийного номера
+                                    </label>
+                                    {{ form.serial_photo }}
+                                    {% if object.serial_photo %}
+                                        <div class="mt-2">
+                                            <img src="{{ object.serial_photo.url }}" 
+                                                alt="Фото серийного номера" 
+                                                class="img-thumbnail" 
+                                                style="max-height: 100px;">
+                                            <div class="form-check mt-1">
+                                                <input type="checkbox" name="delete_serial_photo" id="delete_serial_photo" class="form-check-input">
+                                                <label for="delete_serial_photo" class="form-check-label text-danger">
+                                                    <i class="fas fa-trash"></i> Удалить фото
+                                                </label>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Образец (только для админа) -->
+                                {% if user.is_superuser and not is_create %}
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox" class="form-check-input" id="is_sample" name="is_sample" {% if object.is_sample %}checked{% endif %}>
+                                        <label class="form-check-label" for="is_sample">
+                                            <i class="fas fa-star text-warning"></i> Образец
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Скрытые поля -->
+                                <input type="hidden" name="scanned_photo_base64" id="scanned_photo_base64">
+                                
+                                <!-- Кнопки -->
+                                <div class="d-flex gap-2 mt-4 flex-wrap">
+                                    <a href="{% url 'unified_products:product_list' %}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> Назад
+                                    </a>
+                                    {% if not is_create and can_edit and not is_closed and is_completed %}
+                                        <a href="{% url 'unified_products:product_close' object.pk %}" class="btn btn-success">
+                                            <i class="fas fa-check-circle"></i> Закрыть
+                                        </a>
+                                    {% endif %}
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> 
+                                        {% if is_create %}Создать{% else %}Сохранить{% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Правая колонка - изображения -->
+                            <div class="col-md-8">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-images"></i> Изображения
+                                    {% if sample %}
+                                        <span class="badge bg-info ms-2">
+                                            <i class="fas fa-star text-warning"></i> Образец: {{ sample.serial_number }}
+                                        </span>
+                                    {% endif %}
+                                </h5>
+                                
+                                <div class="row" id="imagesGrid">
+                                    {% for image in images %}
+                                        <div class="col-md-3 col-sm-4 mb-3">
+                                            <div class="image-card {% if image.image %}has-image{% endif %}" data-field="{{ image.field_index }}">
+                                                <span class="status-badge badge {% if image.image %}bg-success{% else %}bg-secondary{% endif %}">
+                                                    {% if image.image %}Загружено{% else %}Пусто{% endif %}
+                                                </span>
+                                                
+                                                {% if image.image %}
+                                                    <button type="button" class="btn btn-sm btn-danger delete-btn" 
+                                                            onclick="deleteImage({{ object.pk }}, {{ image.field_index }})">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                    <img src="{{ image.image.url }}" class="image-preview" alt="{{ image.title|default:'Изображение' }}">
+                                                {% else %}
+                                                    <div class="placeholder"><i class="fas fa-image"></i></div>
+                                                    <img src="" class="image-preview" style="display:none;">
+                                                {% endif %}
+                                                
+                                                <input type="text" class="title-input form-control form-control-sm" 
+                                                       value="{{ image.title|default:'' }}"
+                                                       placeholder="Заголовок"
+                                                       onchange="saveTitle({{ object.pk }}, {{ image.field_index }}, this)">
+                                                
+                                                <div class="d-flex gap-1 mt-1">
+                                                    <div class="file-input-wrapper flex-grow-1">
+                                                        <button class="btn btn-primary btn-sm upload-btn w-100">
+                                                            <i class="fas fa-upload"></i> 
+                                                            {% if image.image %}Заменить{% else %}Загрузить{% endif %}
+                                                        </button>
+                                                        <input type="file" accept="image/*">
+                                                    </div>
+                                                    
+                                                    <!-- ===== КНОПКА "ПРИМЕР" ===== -->
+                                                    {% if image.has_sample_image %}
+                                                        <button type="button" 
+                                                                class="btn btn-sm btn-info sample-btn" 
+                                                                data-bs-toggle="modal" 
+                                                                data-bs-target="#sampleModal{{ image.field_index }}"
+                                                                title="Показать пример из образца">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    {% endif %}
+                                                </div>
+                                                
+                                                <div class="upload-progress">
+                                                    <div class="progress"><div class="progress-bar" style="width: 0%;"></div></div>
+                                                </div>
+                                                
+                                                {% if is_create %}
+                                                    <input type="hidden" name="temp_image_{{ image.field_index }}" 
+                                                           id="temp_image_{{ image.field_index }}">
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- ===== МОДАЛЬНОЕ ОКНО ДЛЯ ПРИМЕРА ===== -->
+                                        {% if image.has_sample_image %}
+                                            <div class="modal fade" id="sampleModal{{ image.field_index }}" tabindex="-1">
+                                                <div class="modal-dialog modal-lg modal-dialog-centered">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header bg-warning text-dark">
+                                                            <h5 class="modal-title">
+                                                                <i class="fas fa-star"></i>
+                                                                Пример: {{ image.sample_image.title|default:"Поле "|add:image.field_index }}
+                                                            </h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                        </div>
+                                                        <div class="modal-body text-center">
+                                                            <img src="{{ image.sample_image.image.url }}" 
+                                                                 class="sample-modal-image img-fluid" 
+                                                                 alt="{{ image.sample_image.title|default:'Пример' }}">
+                                                            <div class="sample-modal-info text-start">
+                                                                <p><strong>Категория:</strong> {{ sample.category.name }}</p>
+                                                                <p><strong>Образец:</strong> {{ sample.serial_number }}</p>
+                                                                <p><strong>Заголовок:</strong> {{ image.sample_image.title|default:"Без заголовка" }}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    window.categoriesData = [
+        {% for cat in categories %}
+            { id: {{ cat.id }}, name: "{{ cat.name }}", prefix: "{{ cat.prefix }}" },
+        {% endfor %}
+    ];
+    window.isCreate = {% if is_create %}true{% else %}false{% endif %};
+    window.productId = {% if object.pk %}{{ object.pk }}{% else %}null{% endif %};
+    
+    console.log('=== ДАННЫЕ ПЕРЕДАНЫ В JS ===');
+    console.log('isCreate:', window.isCreate);
+    console.log('productId:', window.productId);
+    console.log('categories:', window.categoriesData);
+    console.log('===============================');
+</script>
+<script src="{% static 'unified_products/js/product_form.js' %}"></script>
+{% endblock %}

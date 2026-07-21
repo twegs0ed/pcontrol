@@ -1,0 +1,183 @@
+<!-- unified_products/templates/unified_products/product_detail.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header {% if header_color %}{{ header_color }}{% else %}bg-primary{% endif %} text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-microchip"></i> 
+                    {{ product.serial_number }}
+                    <small class="text-light">({{ product.category.name }})</small>
+                </h4>
+                <div>
+                    <span class="badge 
+                        {% if product.status == 'draft' %}bg-secondary
+                        {% elif product.status == 'in_progress' %}bg-primary
+                        {% elif product.status == 'completed' %}bg-success
+                        {% elif product.status == 'closed' %}bg-dark
+                        {% endif %}">
+                        {{ product.get_status_display }}
+                    </span>
+                    {% if product.is_sample %}
+                        <span class="badge bg-warning text-dark ms-1">
+                            <i class="fas fa-star"></i> Образец
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            
+            <!-- Кнопки экспорта -->
+            <div class="mb-4">
+                <div class="btn-group" role="group">
+                    <a href="{% url 'unified_products:export_single_pdf' product.pk %}" 
+                       class="btn btn-danger" 
+                       target="_blank"
+                       title="Экспортировать в PDF">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
+                    <a href="{% url 'unified_products:export_single_word' product.pk %}" 
+                       class="btn btn-primary" 
+                       target="_blank"
+                       title="Экспортировать в Word">
+                        <i class="fas fa-file-word"></i> Word
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Информация -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4">Серийный номер</dt>
+                        <dd class="col-sm-8">{{ product.serial_number }}</dd>
+                        
+                        <dt class="col-sm-4">Категория</dt>
+                        <dd class="col-sm-8">{{ product.category.name }}</dd>
+                        
+                        <dt class="col-sm-4">Ответственный контролер</dt>
+                        <dd class="col-sm-8">
+                            {% if product.owner %}
+                                {{ product.owner.get_full_name|default:product.owner.username }}
+                            {% else %}
+                                <span class="text-muted">Не назначен</span>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-4">Статус</dt>
+                        <dd class="col-sm-8">{{ product.get_status_display }}</dd>
+                        
+                        <dt class="col-sm-4">Описание</dt>
+                        <dd class="col-sm-8">{{ product.description|default:"-" }}</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4">Прогресс</dt>
+                        <dd class="col-sm-8">
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar 
+                                    {% if product.get_progress_percent == 100 %}bg-success
+                                    {% else %}bg-warning
+                                    {% endif %}" 
+                                    role="progressbar" 
+                                    style="width: {{ product.get_progress_percent }}%;">
+                                    {{ product.get_filled_count }}/{{ product.get_total_required }} ({{ product.get_progress_percent }}%)
+                                </div>
+                            </div>
+                        </dd>
+                        
+                        <dt class="col-sm-4">Дата начала проверки</dt>
+                        <dd class="col-sm-8">{{ product.created_at|date:"d.m.Y H:i" }}</dd>
+                        
+                        <dt class="col-sm-4">Дата завершения проверки</dt>
+                        <dd class="col-sm-8">
+                            {% if product.completed_at %}
+                                {{ product.completed_at|date:"d.m.Y H:i" }}
+                            {% else %}
+                                <span class="text-muted">Не завершена</span>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-4">Закрыл</dt>
+                        <dd class="col-sm-8">
+                            {% if product.closed_by %}
+                                {{ product.closed_by.get_full_name|default:product.closed_by.username }}
+                            {% else %}
+                                <span class="text-muted">Не закрыт</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            
+            <!-- Фото серийного номера -->
+            {% if product.serial_photo %}
+                <div class="mb-4">
+                    <h5><i class="fas fa-image"></i> Фото серийного номера</h5>
+                    <img src="{{ product.serial_photo.url }}" 
+                         alt="Фото серийного номера" 
+                         class="img-thumbnail" 
+                         style="max-height: 200px;">
+                </div>
+            {% endif %}
+            
+            <!-- Изображения -->
+            <h5><i class="fas fa-images"></i> Изображения изделия</h5>
+            <div class="row">
+                {% for image in images %}
+                    <div class="col-md-4 col-lg-3 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">{{ image.title|default:"Поле "|add:image.field_index }}</h6>
+                                {% if image.image %}
+                                    <img src="{{ image.image.url }}" 
+                                         alt="{{ image.title }}" 
+                                         class="img-fluid rounded" 
+                                         style="max-height: 150px; object-fit: cover;">
+                                {% else %}
+                                    <div class="text-muted py-4">
+                                        <i class="fas fa-image fa-3x"></i>
+                                        <p class="small mt-2">Нет изображения</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Кнопки -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{% url 'unified_products:product_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Назад
+                </a>
+                <div>
+                    {% if can_edit and not is_closed %}
+                        <a href="{% url 'unified_products:product_edit' product.serial_number %}" 
+                           class="btn btn-warning">
+                            <i class="fas fa-edit"></i> Редактировать
+                        </a>
+                        {% if is_completed %}
+                            <a href="{% url 'unified_products:product_close' product.pk %}" 
+                               class="btn btn-success">
+                                <i class="fas fa-check-circle"></i> Закрыть
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                    {% if user.is_superuser %}
+                        <a href="{% url 'unified_products:product_delete' product.pk %}" 
+                           class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Удалить
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

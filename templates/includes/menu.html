@@ -10,6 +10,7 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
                 {% if user.is_authenticated %}
+                    <!-- Информация о пользователе -->
                     <li class="nav-item">
                         <span class="nav-link">
                             <i class="fas fa-user"></i> {{ user.username }}
@@ -24,56 +25,39 @@
                         </span>
                     </li>
                     
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="productsDropdown" role="button" 
-                           data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-cubes"></i> Изделия
+                    <!-- Список изделий -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'unified_products:product_list' %}">
+                            <i class="fas fa-list"></i> Все изделия
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="productsDropdown">
-                            <li>
-                                <a class="dropdown-item" href="{% url 'gs14:control_list' %}">
-                                    <i class="fas fa-microchip text-primary"></i> GS14
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{% url 'kt08_9a:control_list' %}">
-                                    <i class="fas fa-microchip text-success"></i> KT08_9a
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{% url 'ttr_10ab:control_list' %}">
-                                    <i class="fas fa-cogs text-warning"></i> TTR-10AB
-                                </a>
-                            </li>
-                        </ul>
                     </li>
                     
-                    {% if user.is_superuser or is_controller %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="createDropdown" role="button" 
-                               data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-plus"></i> Создать
+                    <!-- Образцы (фильтр по is_sample) -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'unified_products:product_list' %}?is_sample=1">
+                            <i class="fas fa-star text-warning"></i> Образцы
+                        </a>
+                    </li>
+                    
+                    <!-- Категории (только для админа) -->
+                    {% if user.is_superuser %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'unified_products:category_list' %}">
+                                <i class="fas fa-tags"></i> Категории
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="createDropdown">
-                                <li>
-                                    <a class="dropdown-item" href="{% url 'gs14:control_create' %}">
-                                        <i class="fas fa-microchip text-primary"></i> GS14
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" href="{% url 'kt08_9a:control_create' %}">
-                                        <i class="fas fa-microchip text-success"></i> KT08_9a
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" href="{% url 'ttr_10ab:control_create' %}">
-                                        <i class="fas fa-cogs text-warning"></i> TTR-10AB
-                                    </a>
-                                </li>
-                            </ul>
                         </li>
                     {% endif %}
                     
+                    <!-- Создание -->
+                    {% if user.is_superuser or user.groups.all|length > 0 %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'unified_products:product_create' %}">
+                                <i class="fas fa-plus"></i> Создать
+                            </a>
+                        </li>
+                    {% endif %}
+                    
+                    <!-- Админка -->
                     {% if user.is_superuser %}
                         <li class="nav-item">
                             <a class="nav-link" href="/admin/">
@@ -82,6 +66,7 @@
                         </li>
                     {% endif %}
                     
+                    <!-- Выход -->
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'logout' %}">
                             <i class="fas fa-sign-out-alt"></i> Выйти

@@ -1,0 +1,381 @@
+<!-- unified_products/templates/unified_products/product_list.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-microchip text-primary"></i> 
+            {% if is_sample_view %}
+                <i class="fas fa-star text-warning"></i> Образцы
+            {% else %}
+                Изделия
+            {% endif %}
+        </h1>
+        <div>
+            {% if is_sample_view %}
+                <a href="{% url 'unified_products:product_list' %}" class="btn btn-outline-secondary me-2">
+                    <i class="fas fa-list"></i> Все изделия
+                </a>
+            {% else %}
+                <a href="{% url 'unified_products:product_list' %}?is_sample=1" class="btn btn-outline-warning me-2">
+                    <i class="fas fa-star"></i> Образцы
+                </a>
+            {% endif %}
+            
+            <a href="{% url 'unified_products:product_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Создать
+            </a>
+        </div>
+    </div>
+    
+    <!-- Фильтры -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3" id="filterForm">
+                <!-- Сохраняем параметр is_sample при фильтрации -->
+                {% if request.GET.is_sample == '1' %}
+                    <input type="hidden" name="is_sample" value="1">
+                {% endif %}
+                
+                <div class="col-md-3">
+                    <label class="form-label">Категория</label>
+                    <select name="category" class="form-select">
+                        <option value="">Все категории</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if current_filters.category == cat.id|stringformat:"s" %}selected{% endif %}>
+                                {{ cat.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label">Статус</label>
+                    <select name="status" class="form-select">
+                        <option value="">Все статусы</option>
+                        <option value="draft" {% if current_filters.status == 'draft' %}selected{% endif %}>Черновик</option>
+                        <option value="in_progress" {% if current_filters.status == 'in_progress' %}selected{% endif %}>В процессе</option>
+                        <option value="completed" {% if current_filters.status == 'completed' %}selected{% endif %}>Завершен</option>
+                        <option value="closed" {% if current_filters.status == 'closed' %}selected{% endif %}>Закрыт</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label">Владелец (поиск)</label>
+                    <input type="text" name="owner_search" class="form-control" 
+                           placeholder="Введите имя или фамилию..." 
+                           value="{{ current_filters.owner_search }}" 
+                           id="ownerSearchInput"
+                           autocomplete="off">
+                    <div id="ownerSuggestions" class="suggestions-box" style="display: none; position: absolute; z-index: 1000; background: white; border: 1px solid #ccc; border-radius: 4px; max-height: 200px; overflow-y: auto; width: calc(100% - 2px);"></div>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label">Поиск по номеру</label>
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="Введите серийный номер..." 
+                           value="{{ current_filters.search }}">
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label">Дата от</label>
+                    <input type="date" name="date_from" class="form-control" 
+                           value="{{ current_filters.date_from }}">
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label">Дата до</label>
+                    <input type="date" name="date_to" class="form-control" 
+                           value="{{ current_filters.date_to }}">
+                </div>
+                
+                <div class="col-md-6 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary w-50">
+                        <i class="fas fa-search"></i> Применить
+                    </button>
+                    <a href="{% url 'unified_products:product_list' %}" class="btn btn-secondary w-50">
+                        <i class="fas fa-undo"></i> Сбросить
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Список -->
+    <div class="card shadow">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Серийный номер</th>
+                            <th>Категория</th>
+                            <th>Владелец</th>
+                            <th>Статус</th>
+                            <th>Образец</th>
+                            <th>Прогресс</th>
+                            <th>Дата создания</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td><strong>{{ product.serial_number }}</strong></td>
+                            <td>{{ product.category.name }}</td>
+                            <td>
+                                {% if product.owner %}
+                                    {{ product.owner.get_full_name|default:product.owner.username }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if product.status == 'draft' %}bg-secondary
+                                    {% elif product.status == 'in_progress' %}bg-primary
+                                    {% elif product.status == 'completed' %}bg-success
+                                    {% elif product.status == 'closed' %}bg-dark
+                                    {% endif %}">
+                                    {{ product.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if product.is_sample %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-star"></i> Образец
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 20px; width: 120px;">
+                                    <div class="progress-bar 
+                                        {% if product.get_progress_percent == 100 %}bg-success
+                                        {% else %}bg-warning
+                                        {% endif %}" 
+                                        role="progressbar" 
+                                        style="width: {{ product.get_progress_percent }}%;">
+                                        {{ product.get_filled_count }}/{{ product.get_total_required }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ product.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'unified_products:export_single_pdf' product.pk %}" 
+                                       class="btn btn-danger" 
+                                       target="_blank"
+                                       title="Экспортировать в PDF">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </a>
+                                    <a href="{% url 'unified_products:export_single_word' product.pk %}" 
+                                       class="btn btn-primary" 
+                                       target="_blank"
+                                       title="Экспортировать в Word">
+                                        <i class="fas fa-file-word"></i>
+                                    </a>
+                                    <a href="{% url 'unified_products:product_detail' product.pk %}" 
+                                       class="btn btn-info"
+                                       title="Просмотр">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if product.can_edit %}
+                                        <a href="{% url 'unified_products:product_edit' product.serial_number %}" 
+                                           class="btn btn-warning"
+                                           title="Редактировать">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    {% endif %}
+                                    {% if user.is_superuser %}
+                                        <a href="{% url 'unified_products:product_delete' product.pk %}" 
+                                           class="btn btn-danger"
+                                           title="Удалить">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <i class="fas fa-box-open fa-3x text-muted d-block mb-2"></i>
+                                <p class="text-muted">
+                                    {% if is_sample_view %}
+                                        Нет образцов
+                                    {% else %}
+                                        Нет изделий
+                                    {% endif %}
+                                </p>
+                                {% if not is_sample_view %}
+                                    <a href="{% url 'unified_products:product_create' %}" class="btn btn-primary">
+                                        <i class="fas fa-plus"></i> Создать изделие
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Пагинация -->
+            {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.is_sample %}&is_sample={{ request.GET.is_sample }}{% endif %}{% if request.GET.owner_search %}&owner_search={{ request.GET.owner_search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">&laquo;</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.is_sample %}&is_sample={{ request.GET.is_sample }}{% endif %}{% if request.GET.owner_search %}&owner_search={{ request.GET.owner_search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">{{ page_obj.previous_page_number }}</a>
+                        </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_obj.number }}</span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.is_sample %}&is_sample={{ request.GET.is_sample }}{% endif %}{% if request.GET.owner_search %}&owner_search={{ request.GET.owner_search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">{{ page_obj.next_page_number }}</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.is_sample %}&is_sample={{ request.GET.is_sample }}{% endif %}{% if request.GET.owner_search %}&owner_search={{ request.GET.owner_search }}{% endif %}{% if request.GET.date_from %}&date_from={{ request.GET.date_from }}{% endif %}{% if request.GET.date_to %}&date_to={{ request.GET.date_to }}{% endif %}">&raquo;</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ===== СКРИПТЫ ===== -->
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ===== АВТОДОПОЛНЕНИЕ ДЛЯ ПОИСКА ВЛАДЕЛЬЦА =====
+    const ownerInput = document.getElementById('ownerSearchInput');
+    const suggestionsBox = document.getElementById('ownerSuggestions');
+    let debounceTimer;
+    
+    if (ownerInput && suggestionsBox) {
+        ownerInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            clearTimeout(debounceTimer);
+            
+            if (query.length < 2) {
+                suggestionsBox.style.display = 'none';
+                return;
+            }
+            
+            debounceTimer = setTimeout(function() {
+                fetch('/unified-products/ajax/search-owners/?q=' + encodeURIComponent(query))
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.owners.length > 0) {
+                            suggestionsBox.innerHTML = '';
+                            data.owners.forEach(function(owner) {
+                                const div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.style.cssText = 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee;';
+                                div.innerHTML = owner.full_name + ' (' + owner.username + ')';
+                                div.dataset.id = owner.id;
+                                div.dataset.name = owner.full_name + ' (' + owner.username + ')';
+                                
+                                div.addEventListener('click', function() {
+                                    ownerInput.value = this.dataset.name;
+                                    suggestionsBox.style.display = 'none';
+                                    // Добавляем скрытое поле с ID для отправки
+                                    const hiddenInput = document.createElement('input');
+                                    hiddenInput.type = 'hidden';
+                                    hiddenInput.name = 'owner_id';
+                                    hiddenInput.value = this.dataset.id;
+                                    document.getElementById('filterForm').appendChild(hiddenInput);
+                                });
+                                
+                                div.addEventListener('mouseover', function() {
+                                    this.style.backgroundColor = '#f0f0f0';
+                                });
+                                
+                                div.addEventListener('mouseout', function() {
+                                    this.style.backgroundColor = 'transparent';
+                                });
+                                
+                                suggestionsBox.appendChild(div);
+                            });
+                            suggestionsBox.style.display = 'block';
+                            
+                            // Позиционирование
+                            const rect = ownerInput.getBoundingClientRect();
+                            suggestionsBox.style.left = rect.left + 'px';
+                            suggestionsBox.style.top = (rect.bottom + 2) + 'px';
+                            suggestionsBox.style.width = rect.width + 'px';
+                            
+                        } else {
+                            suggestionsBox.style.display = 'none';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Ошибка поиска владельцев:', error);
+                        suggestionsBox.style.display = 'none';
+                    });
+            }, 300);
+        });
+        
+        // Скрываем подсказки при клике вне поля
+        document.addEventListener('click', function(e) {
+            if (e.target !== ownerInput && e.target !== suggestionsBox) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+        
+        // При отправке формы - если есть owner_search, но нет owner_id
+        document.getElementById('filterForm').addEventListener('submit', function(e) {
+            const ownerSearch = ownerInput.value.trim();
+            if (ownerSearch) {
+                // Проверяем, есть ли уже скрытое поле owner_id
+                const existingHidden = this.querySelector('input[name="owner_id"]');
+                if (!existingHidden) {
+                    // Если пользователь ввел текст, но не выбрал из списка - отправляем как текст
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'owner_search';
+                    hiddenInput.value = ownerSearch;
+                    this.appendChild(hiddenInput);
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .suggestions-box {
+        position: absolute;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .suggestion-item:hover {
+        background-color: #f0f0f0 !important;
+    }
+    .suggestion-item:active {
+        background-color: #e0e0e0 !important;
+    }
+</style>
+{% endblock %}
+
+{% endblock %}
