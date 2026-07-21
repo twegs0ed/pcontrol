@@ -90,21 +90,46 @@ class TTR10ABListView(LoginRequiredMixin, ListView):
         return context
 
 
-class TTR10ABDetailView(LoginRequiredMixin, DetailView):
-    """Детальная страница объекта TTR-10AB"""
+class TTR10ABDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    """Детальная страница объекта TTR-10AB (только для контролеров и аудиторов)"""
     model = TTR10AB
     template_name = 'common/detail.html'
     context_object_name = 'control'
     
+    def test_func(self):
+        """Проверка прав доступа к просмотру"""
+        user = self.request.user
+        
+        # Суперпользователь всегда может
+        if user.is_superuser:
+            return True
+        
+        # Контролер может просматривать
+        if user.groups.filter(name='Контролер').exists():
+            return True
+        
+        # Аудитор может просматривать
+        if user.groups.filter(name='Аудитор').exists():
+            return True
+        
+        return False
+    
     def get_queryset(self):
         qs = super().get_queryset()
+        user = self.request.user
         
-        if self.request.user.is_superuser:
+        # Суперпользователь видит все
+        if user.is_superuser:
             return qs
-        if self.request.user.groups.filter(name='Аудитор').exists():
+        
+        # Контролер видит только свои объекты
+        if user.groups.filter(name='Контролер').exists():
+            return qs.filter(owner=user)
+        
+        # Аудитор видит все объекты
+        if user.groups.filter(name='Аудитор').exists():
             return qs
-        if self.request.user.groups.filter(name='Контролер').exists():
-            return qs.filter(owner=self.request.user)
+        
         return qs.none()
     
     def get_context_data(self, **kwargs):
@@ -116,12 +141,14 @@ class TTR10ABDetailView(LoginRequiredMixin, DetailView):
         context['app_name'] = 'TTR-10AB'
         context['namespace'] = 'ttr_10ab'
         context['header_color'] = 'bg-warning'
+        
         model = self.object._meta.model
         verbose_names = {}
         for field in model._meta.fields:
             if field.name.startswith('title'):
                 verbose_names[field.name] = field.verbose_name
         context['verbose_names'] = verbose_names
+        
         return context
 
 
@@ -194,6 +221,29 @@ class TTR10ABUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         obj = self.get_object()
         user = self.request.user
         
+        # ===== СУПЕРПОЛЬЗОВАТЕЛЬ МОЖЕТ РЕДАКТИРОВАТЬ ВСЕ =====
+        if user.is_superuser:
+            return True
+        
+        # ===== ПРОВЕРКА: ЕСЛИ ОБЪЕКТ ЗАВЕРШЕН =====
+        if obj.status in ['completed', 'closed']:
+            # Контролер или Аудитор - перенаправляем на просмотр
+            if user.groups.filter(name='Контролер').exists() or user.groups.filter(name='Аудитор').exists():
+                messages.warning(
+                    self.request, 
+                    f'ℹ️ Объект TTR-10AB с серийным номером {obj.serial_number} уже завершен. '
+                    f'Доступ только для просмотра.'
+                )
+                # Перенаправляем на страницу просмотра
+                return redirect('ttr_10ab:control_detail', pk=obj.pk)
+            else:
+                messages.error(
+                    self.request, 
+                    '⛔ У вас нет прав для редактирования этого объекта.'
+                )
+                return False
+        
+        # ===== ПРОВЕРКА ПРАВ НА РЕДАКТИРОВАНИЕ =====
         if not obj.can_edit(user):
             if user.groups.filter(name='Контролер').exists():
                 if obj.status == 'draft':
@@ -225,6 +275,37 @@ class TTR10ABUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         
         return True
     
+    def dispatch(self, request, *args, **kwargs):
+        """Переопределяем dispatch для дополнительной проверки"""
+        try:
+            obj = self.get_object()
+            user = request.user
+            
+            # Суперпользователь может все
+            if user.is_superuser:
+                return super().dispatch(request, *args, **kwargs)
+            
+            # Если объект завершен
+            if obj.status in ['completed', 'closed']:
+                # Контролер или Аудитор - редирект на просмотр
+                if user.groups.filter(name='Контролер').exists() or user.groups.filter(name='Аудитор').exists():
+                    messages.warning(
+                        request, 
+                        f'ℹ️ Объект TTR-10AB с серийным номером {obj.serial_number} уже завершен. '
+                        f'Доступ только для просмотра.'
+                    )
+                    return redirect('ttr_10ab:control_detail', pk=obj.pk)
+                else:
+                    messages.error(
+                        request, 
+                        '⛔ У вас нет прав для просмотра этого объекта.'
+                    )
+                    return redirect('ttr_10ab:control_list')
+        except:
+            pass
+        
+        return super().dispatch(request, *args, **kwargs)
+    
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['is_create'] = False
@@ -245,6 +326,13 @@ class TTR10ABUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context['header_color'] = 'bg-warning'
         context['scan_url'] = '/ttr_10ab/scan-serial/'
         context['can_edit'] = self.object.can_edit(self.request.user)
+        
+        # Добавляем информацию о статусе объекта
+        obj = self.get_object()
+        context['is_completed'] = obj.is_completed()
+        context['is_closed'] = obj.status == 'closed'
+        context['can_edit'] = obj.can_edit(self.request.user)
+        
         return context
     
     def form_valid(self, form):
@@ -293,7 +381,7 @@ class TTR10ABUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
                 self.request, 
                 f'✅ Все фото загружены! Объект TTR-10AB {obj.serial_number} завершен.'
             )
-            return redirect('ttr_10ab:control_list')
+            return redirect('ttr_10ab:control_detail', pk=obj.pk)  # Переход на детальную страницу
         else:
             if obj.status == 'draft':
                 obj.status = 'in_progress'

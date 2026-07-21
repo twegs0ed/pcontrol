@@ -212,11 +212,10 @@ class Control(models.Model):
     def can_edit(self, user=None):
         """
         Проверка, может ли пользователь редактировать объект
-        Если user не передан, используем текущего пользователя из request
         """
         from django.contrib.auth.models import AnonymousUser
         
-        # Если пользователь не передан, возвращаем False
+        # Если пользователь не передан или аноним
         if user is None or isinstance(user, AnonymousUser):
             return False
         
@@ -224,11 +223,18 @@ class Control(models.Model):
         if user.is_superuser:
             return True
         
-        # Контролер может редактировать только свои объекты в статусе draft или in_progress
-        if user.groups.filter(name='Контролер').exists():
-            if self.owner != user:
-                return False
+        # Если пользователь является владельцем объекта - разрешаем
+        # НЕЗАВИСИМО ОТ ГРУППЫ!
+        if self.owner == user:
             return self.status in ['draft', 'in_progress']
+        
+        # Проверяем группу Контролер (для редактирования чужих объектов)
+        if user.groups.filter(name='Контролер').exists():
+            # Контролер может редактировать только если он владелец
+            # (уже проверено выше) или если объект без владельца
+            if self.owner is None:
+                return self.status in ['draft', 'in_progress']
+            return False
         
         return False
     

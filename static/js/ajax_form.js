@@ -1,7 +1,5 @@
-console.log('=== СКРИПТ GS14 ЗАГРУЖЕН ===');
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== DOM загружен ===');
     
     // Инициализация предпросмотра для всех изображений
     for (var i = 1; i <= 7; i++) {
@@ -22,10 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
     var enterBtn = document.getElementById('enterBtn');
     var hiddenField = document.getElementById('scanned_photo_base64');
     
-    console.log('scanInput:', scanInput);
-    console.log('scanBtn:', scanBtn);
-    console.log('enterBtn:', enterBtn);
-    console.log('hiddenField:', hiddenField);
     
     // Функция сканирования
     function scanSend() {
@@ -53,7 +47,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         var scanUrl = '/gs14/scan-serial/';
-        console.log('Отправка на:', scanUrl);
         
         fetch(scanUrl, {
             method: 'POST',
@@ -71,17 +64,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(function(data) {
-            console.log('Ответ сервера:', data);
             var html = '';
             
             // ===== Сохраняем фото в скрытое поле =====
             if (data.photo_base64) {
-                console.log('Получено фото, длина:', data.photo_base64.length);
                 
                 if (hiddenField) {
                     hiddenField.value = 'data:image/jpeg;base64,' + data.photo_base64;
-                    console.log('✅ Фото сохранено в скрытое поле');
-                    console.log('Длина hiddenField.value:', hiddenField.value.length);
                 } else {
                     console.error('❌ hiddenField не найден!');
                     var form = document.getElementById('control-form');
@@ -92,7 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         newHidden.name = 'scanned_photo_base64';
                         newHidden.value = 'data:image/jpeg;base64,' + data.photo_base64;
                         form.appendChild(newHidden);
-                        console.log('✅ Создано новое скрытое поле');
                         hiddenField = newHidden;
                     }
                 }
@@ -206,12 +194,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Привязываем обработчики
     if (scanBtn) {
         scanBtn.onclick = scanSend;
-        console.log('Обработчик для scanSend привязан');
     }
     
     if (scanInput) {
         scanInput.onchange = function() {
-            console.log('Файл выбран');
             if (this.files[0]) {
                 this.style.borderColor = '#17a2b8';
                 this.style.backgroundColor = '#f0f8ff';
@@ -232,7 +218,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     
-    console.log('=== СКРИПТ GS14 ГОТОВ ===');
 });
 
 // Функция предпросмотра изображения
@@ -608,13 +593,10 @@ class AjaxFormHandler {
                     if (data.photo_base64.length > 100) {
                         // Добавляем префикс для base64 изображения
                         hiddenField.value = `data:image/jpeg;base64,${data.photo_base64}`;
-                        console.log('✅ Фото сохранено в скрытое поле, длина:', hiddenField.value.length);
                         
                         // Проверяем, что поле действительно заполнилось
                         if (hiddenField.value.length > 100) {
-                            console.log('✅ Фото успешно сохранено!');
                         } else {
-                            console.warn('⚠️ Фото не сохранилось в скрытое поле');
                         }
                     } else {
                         console.warn('⚠️ Фото слишком маленькое:', data.photo_base64.length);

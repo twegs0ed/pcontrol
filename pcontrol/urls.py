@@ -21,11 +21,15 @@ from .views import index, custom_logout
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views  # Правильный импорт
+from . import views
+app_name = 'pcontrol'
 
 
 urlpatterns = [
+    path('', include('pcontrol_app.urls', namespace='pcontrol')),
+    path('pcontrol/', include('pcontrol_app.urls')),
     path('admin/', admin.site.urls),
-    path('', index, name='index'),  # главная страница
+    #path('', index, name='index'),  # главная страница
     path('gs14/', include('gs14.urls')),
     path('kt08_9a/', include('kt08_9a.urls')),
     # Авторизация

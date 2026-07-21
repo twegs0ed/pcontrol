@@ -104,21 +104,46 @@ class KT08_9aListView(LoginRequiredMixin, ListView):
         return context
 
 
-class KT08_9aDetailView(LoginRequiredMixin, DetailView):
-    """Детальная страница объекта KT08_9a"""
+class KT08_9aDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    """Детальная страница объекта KT08_9a (только для контролеров и аудиторов)"""
     model = KT08_9a
-    template_name = 'common/detail.html'  # ИЗМЕНЕНО
+    template_name = 'common/detail.html'
     context_object_name = 'control'
+    
+    def test_func(self):
+        """Проверка прав доступа к просмотру"""
+        user = self.request.user
+        
+        # Суперпользователь всегда может
+        if user.is_superuser:
+            return True
+        
+        # Контролер может просматривать
+        if user.groups.filter(name='Контролер').exists():
+            return True
+        
+        # Аудитор может просматривать
+        if user.groups.filter(name='Аудитор').exists():
+            return True
+        
+        return False
     
     def get_queryset(self):
         qs = super().get_queryset()
+        user = self.request.user
         
-        if self.request.user.is_superuser:
+        # Суперпользователь видит все
+        if user.is_superuser:
             return qs
-        if self.request.user.groups.filter(name='Аудитор').exists():
+        
+        # Контролер видит только свои объекты
+        if user.groups.filter(name='Контролер').exists():
+            return qs.filter(owner=user)
+        
+        # Аудитор видит все объекты
+        if user.groups.filter(name='Аудитор').exists():
             return qs
-        if self.request.user.groups.filter(name='Контролер').exists():
-            return qs.filter(owner=self.request.user)
+        
         return qs.none()
     
     def get_context_data(self, **kwargs):
@@ -128,14 +153,16 @@ class KT08_9aDetailView(LoginRequiredMixin, DetailView):
         context['is_auditor'] = self.request.user.groups.filter(name='Аудитор').exists()
         context['can_edit'] = self.object.can_edit(self.request.user)
         context['app_name'] = 'KT08_9a'
-        context['namespace'] = 'kt08_9a'  # ДОБАВЛЕНО
-        context['header_color'] = 'bg-success'  # ДОБАВЛЕНО
+        context['namespace'] = 'kt08_9a'
+        context['header_color'] = 'bg-success'
+        
         model = self.object._meta.model
         verbose_names = {}
         for field in model._meta.fields:
             if field.name.startswith('title'):
                 verbose_names[field.name] = field.verbose_name
-        context['verbose_names'] = verbose_names    
+        context['verbose_names'] = verbose_names
+        
         return context
 
 
@@ -201,13 +228,36 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     """Редактирование объекта KT08_9a"""
     model = KT08_9a
     form_class = KT08_9aForm
-    template_name = 'common/form.html'  # ИЗМЕНЕНО
+    template_name = 'common/form.html'
     success_url = reverse_lazy('kt08_9a:control_list')
     
     def test_func(self):
         obj = self.get_object()
         user = self.request.user
         
+        # ===== СУПЕРПОЛЬЗОВАТЕЛЬ МОЖЕТ РЕДАКТИРОВАТЬ ВСЕ =====
+        if user.is_superuser:
+            return True
+        
+        # ===== ПРОВЕРКА: ЕСЛИ ОБЪЕКТ ЗАВЕРШЕН =====
+        if obj.status in ['completed', 'closed']:
+            # Контролер или Аудитор - перенаправляем на просмотр
+            if user.groups.filter(name='Контролер').exists() or user.groups.filter(name='Аудитор').exists():
+                messages.warning(
+                    self.request, 
+                    f'ℹ️ Объект KT08_9a с серийным номером {obj.serial_number} уже завершен. '
+                    f'Доступ только для просмотра.'
+                )
+                # Перенаправляем на страницу просмотра
+                return redirect('kt08_9a:control_detail', pk=obj.pk)
+            else:
+                messages.error(
+                    self.request, 
+                    '⛔ У вас нет прав для редактирования этого объекта.'
+                )
+                return False
+        
+        # ===== ПРОВЕРКА ПРАВ НА РЕДАКТИРОВАНИЕ =====
         if not obj.can_edit(user):
             if user.groups.filter(name='Контролер').exists():
                 if obj.status == 'draft':
@@ -239,6 +289,37 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         
         return True
     
+    def dispatch(self, request, *args, **kwargs):
+        """Переопределяем dispatch для дополнительной проверки"""
+        try:
+            obj = self.get_object()
+            user = request.user
+            
+            # Суперпользователь может все
+            if user.is_superuser:
+                return super().dispatch(request, *args, **kwargs)
+            
+            # Если объект завершен
+            if obj.status in ['completed', 'closed']:
+                # Контролер или Аудитор - редирект на просмотр
+                if user.groups.filter(name='Контролер').exists() or user.groups.filter(name='Аудитор').exists():
+                    messages.warning(
+                        request, 
+                        f'ℹ️ Объект KT08_9a с серийным номером {obj.serial_number} уже завершен. '
+                        f'Доступ только для просмотра.'
+                    )
+                    return redirect('kt08_9a:control_detail', pk=obj.pk)
+                else:
+                    messages.error(
+                        request, 
+                        '⛔ У вас нет прав для просмотра этого объекта.'
+                    )
+                    return redirect('kt08_9a:control_list')
+        except:
+            pass
+        
+        return super().dispatch(request, *args, **kwargs)
+    
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['is_create'] = False
@@ -257,8 +338,15 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context['app_name'] = 'KT08_9a'
         context['namespace'] = 'kt08_9a'
         context['header_color'] = 'bg-success'
-        context['scan_url'] = '/kt08_9a/scan-serial/'  # <-- ДОБАВЛЕНО (без /control/)
+        context['scan_url'] = '/kt08_9a/scan-serial/'
         context['can_edit'] = self.object.can_edit(self.request.user)
+        
+        # Добавляем информацию о статусе объекта
+        obj = self.get_object()
+        context['is_completed'] = obj.is_completed()
+        context['is_closed'] = obj.status == 'closed'
+        context['can_edit'] = obj.can_edit(self.request.user)
+        
         return context
     
     def form_valid(self, form):
@@ -282,11 +370,7 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
                 obj.serial_photo = None
         
         # Обработка загрузки нового serial_photo
-        # Файл уже сохранен в объекте через form.save()
-        # Но нужно убедиться, что он сохранился
         if 'serial_photo' in self.request.FILES:
-            # Django автоматически сохранит файл при сохранении объекта
-            # Но мы можем добавить логирование
             logger.info(f"Загружено новое фото серийного номера для {obj.serial_number}")
         
         # Обработка удаления image1-image7
@@ -316,7 +400,7 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
                 self.request, 
                 f'✅ Все фото загружены! Объект KT08_9a {obj.serial_number} завершен.'
             )
-            return redirect('kt08_9a:control_list')  # Переход на список
+            return redirect('kt08_9a:control_detail', pk=obj.pk)  # Переход на детальную страницу
         else:
             if obj.status == 'draft':
                 obj.status = 'in_progress'
@@ -325,7 +409,7 @@ class KT08_9aUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
                 self.request, 
                 f'📝 Объект KT08_9a {obj.serial_number} успешно обновлен. Продолжите заполнение.'
             )
-            return redirect('kt08_9a:control_edit', serial_number=obj.serial_number)  # Остаемся на редактировании
+            return redirect('kt08_9a:control_edit', serial_number=obj.serial_number)
 
 
 class KT08_9aDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):

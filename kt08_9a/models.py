@@ -232,41 +232,31 @@ class KT08_9a(models.Model):
     def can_edit(self, user=None):
         """
         Проверка, может ли пользователь редактировать объект
-        
-        Аргументы:
-            user: Объект пользователя Django
-        
-        Возвращает:
-            bool: True если пользователь может редактировать, иначе False
         """
-        # Если пользователь не передан
-        if user is None:
-            return False
+        from django.contrib.auth.models import AnonymousUser
         
-        # Анонимный пользователь не может редактировать
-        if isinstance(user, AnonymousUser):
+        # Если пользователь не передан или аноним
+        if user is None or isinstance(user, AnonymousUser):
             return False
         
         # Суперпользователь всегда может редактировать
         if user.is_superuser:
             return True
         
-        # Проверяем, что пользователь в группе "Контролер"
-        is_controller = user.groups.filter(name='Контролер').exists()
+        # Если пользователь является владельцем объекта - разрешаем
+        # НЕЗАВИСИМО ОТ ГРУППЫ!
+        if self.owner == user:
+            return self.status in ['draft', 'in_progress']
         
-        # Если не контролер и не суперпользователь
-        if not is_controller:
+        # Проверяем группу Контролер (для редактирования чужих объектов)
+        if user.groups.filter(name='Контролер').exists():
+            # Контролер может редактировать только если он владелец
+            # (уже проверено выше) или если объект без владельца
+            if self.owner is None:
+                return self.status in ['draft', 'in_progress']
             return False
         
-        # Проверяем, что пользователь - владелец объекта
-        if self.owner != user:
-            return False
-        
-        # Разрешаем редактирование только для статусов draft и in_progress
-        if self.status not in ['draft', 'in_progress']:
-            return False
-        
-        return True
+        return False
     
     def can_delete(self, user=None):
         """

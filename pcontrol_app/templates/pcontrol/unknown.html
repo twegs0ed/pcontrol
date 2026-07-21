@@ -1,0 +1,167 @@
+<!-- pcontrol/templates/pcontrol/unknown.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    
+                    <!-- ЗАГОЛОВОК -->
+                    <h2 class="text-center mb-4">
+                        <i class="fas fa-user-shield text-success"></i>
+                        Создание нового объекта
+                    </h2>
+                    
+                    <!-- СООБЩЕНИЯ -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <!-- ИНФОРМАЦИЯ О СЕРИЙНОМ НОМЕРЕ -->
+                    <div class="alert {% if has_prefix %}alert-info{% else %}alert-warning{% endif %}">
+                        <strong>Серийный номер:</strong> 
+                        <code class="fs-5">{{ serial_number }}</code>
+                        
+                        {% if has_prefix %}
+                            <br>
+                            <span class="badge bg-success mt-2">
+                                <i class="fas fa-check-circle"></i>
+                                Найден префикс в системе
+                            </span>
+                            <br>
+                            <small>Выберите тип изделия для создания.</small>
+                        {% else %}
+                            <br>
+                            <span class="badge bg-warning mt-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Префикс не найден в системе
+                            </span>
+                            <br>
+                            <small>Для этого серийного номера не найден соответствующий префикс.</small>
+                        {% endif %}
+                    </div>
+                    
+                    <form method="post" action="{% url 'pcontrol:unknown' serial_number=serial_number %}">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="app_label" class="form-label fw-bold">
+                                <i class="fas fa-cubes"></i> Выберите тип изделия:
+                            </label>
+                            
+                            <select class="form-select form-select-lg" 
+                                    id="app_label" 
+                                    name="app_label" 
+                                    required>
+                                <option value="">-- Выберите из списка --</option>
+                                {% for app in available_apps %}
+                                    <option value="{{ app.app_label }}">
+                                        {{ app.product_name }}
+                                        {% if app.app_name %} ({{ app.app_name }}){% endif %}
+                                        {% if app.prefix %} - префикс: {{ app.prefix }}{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            
+                            <div class="form-text text-muted mt-2">
+                                <i class="fas fa-info-circle"></i>
+                                {% if user.is_superuser %}
+                                    <span class="text-danger">
+                                        <i class="fas fa-crown"></i> 
+                                        <strong>Суперпользователь:</strong> Вы можете создавать любые объекты.
+                                    </span>
+                                {% elif user.groups.filter.name == 'Контролер' %}
+                                    <span class="text-success">
+                                        <i class="fas fa-check-circle"></i> 
+                                        <strong>Контролер:</strong> Вы можете создавать новые объекты.
+                                    </span>
+                                {% else %}
+                                    <span class="text-warning">
+                                        <i class="fas fa-exclamation-triangle"></i> 
+                                        У вас нет прав для создания объектов. Обратитесь к администратору.
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
+                                <i class="fas fa-plus-circle"></i> Создать изделие
+                            </button>
+                            <a href="{% url 'pcontrol:index' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Вернуться к поиску
+                            </a>
+                        </div>
+                    </form>
+                    
+                    <hr class="my-4">
+                    <div class="text-center text-muted small">
+                        <p>
+                            <i class="fas fa-shield-alt"></i>
+                            Все создаваемые объекты будут привязаны к серийному номеру 
+                            <strong>{{ serial_number }}</strong>
+                        </p>
+                        <p class="mb-0">
+                            <i class="fas fa-user-tag"></i>
+                            Создает: <strong>{{ user.get_full_name|default:user.username }}</strong>
+                            
+                            {% if user.is_superuser %}
+                                <span class="badge bg-danger">Суперпользователь</span>
+                            {% elif user.groups.filter.name == 'Контролер' %}
+                                <span class="badge bg-success">Контролер</span>
+                            {% elif user.groups.filter.name == 'Аудитор' %}
+                                <span class="badge bg-info">Аудитор</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Пользователь</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('app_label');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    if (select && submitBtn) {
+        // Начальное состояние
+        if (select.value) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('btn-secondary');
+            submitBtn.classList.add('btn-success');
+        } else {
+            submitBtn.disabled = true;
+            submitBtn.classList.remove('btn-success');
+            submitBtn.classList.add('btn-secondary');
+        }
+        
+        select.addEventListener('change', function() {
+            if (this.value) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('btn-secondary');
+                submitBtn.classList.add('btn-success');
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.classList.remove('btn-success');
+                submitBtn.classList.add('btn-secondary');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

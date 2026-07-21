@@ -1,0 +1,90 @@
+<!-- pcontrol/templates/pcontrol/object_detail.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-warning">
+                    <h4 class="mb-0">
+                        <i class="fas fa-eye"></i> Просмотр объекта
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-lock"></i>
+                        <strong>Внимание!</strong> Этот объект проверяется контролером 
+                        <strong>{{ owner_name }}</strong>.<br>
+                        <small>Доступ только для просмотра.</small>
+                    </div>
+                    
+                    <table class="table table-bordered">
+                        <tr>
+                            <th style="width: 40%;">Серийный номер</th>
+                            <td><code>{{ serial_number }}</code></td>
+                        </tr>
+                        <tr>
+                            <th>Изделие</th>
+                            <td>{{ product_name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Контролер</th>
+                            <td><strong>{{ owner_name }}</strong></td>
+                        </tr>
+                        {% if status %}
+                        <tr>
+                            <th>Статус</th>
+                            <td><span class="badge bg-info">{{ status }}</span></td>
+                        </tr>
+                        {% endif %}
+                        {% if created_at %}
+                        <tr>
+                            <th>Дата создания</th>
+                            <td>{{ created_at|date:"d.m.Y H:i:s" }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if updated_at %}
+                        <tr>
+                            <th>Дата обновления</th>
+                            <td>{{ updated_at|date:"d.m.Y H:i:s" }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                    
+                    {% if fields %}
+                    <h5 class="mt-4">Дополнительная информация:</h5>
+                    <table class="table table-bordered table-sm">
+                        {% for label, value in fields.items %}
+                            <tr>
+                                <th style="width: 40%;">{{ label }}</th>
+                                <td>
+                                    {% if value|length > 100 %}
+                                        <details>
+                                            <summary>Показать полностью</summary>
+                                            {{ value }}
+                                        </details>
+                                    {% else %}
+                                        {{ value }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                    {% endif %}
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <a href="{% url 'pcontrol:index' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-arrow-left"></i> Вернуться к поиску
+                        </a>
+                        <a href="{% url 'pcontrol:main_page' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-home"></i> На главную
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

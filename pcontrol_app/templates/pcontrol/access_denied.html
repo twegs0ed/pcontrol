@@ -1,0 +1,48 @@
+<!-- pcontrol/templates/pcontrol/access_denied.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow border-danger">
+                <div class="card-body p-5">
+                    
+                    <div class="text-center mb-4">
+                        <i class="fas fa-lock fa-5x text-danger"></i>
+                        <h2 class="mt-3 text-danger">⛔ ДОСТУП ЗАПРЕЩЕН</h2>
+                    </div>
+                    
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Объект занят другим контролером</h5>
+                        <hr>
+                        <p><strong>Серийный номер:</strong> <code class="fs-5">{{ serial_number }}</code></p>
+                        <p><strong>Изделие:</strong> {{ product_name }}</p>
+                        {% if app_name %}
+                            <p><strong>Приложение:</strong> {{ app_name }}</p>
+                        {% endif %}
+                        <p><strong>Контролер:</strong> <span class="fw-bold">{{ owner_name }}</span></p>
+                        <hr>
+                        <p class="mb-0">
+                            <i class="fas fa-info-circle"></i>
+                            Этот объект уже проверяется другим контролером. 
+                            Вы не можете редактировать его.
+                        </p>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'pcontrol:index' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-arrow-left"></i> Вернуться к поиску
+                        </a>
+                        <a href="{% url 'pcontrol:main_page' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-home"></i> На главную
+                        </a>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
