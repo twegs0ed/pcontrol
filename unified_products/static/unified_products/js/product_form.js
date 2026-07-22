@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const scanBtn = document.getElementById('scanSerialBtn');
     const form = document.getElementById('productForm');
     const scannedPhotoInput = document.getElementById('scanned_photo_base64');
+    const isCreate = window.isCreate || false;
+    const isSuperuser = window.isSuperuser || false;
     
     // ===== ДАННЫЕ КАТЕГОРИЙ =====
     const categories = window.categoriesData || [];
@@ -511,7 +513,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     if (scanBtn && serialInput) {
-    console.log('Кнопка сканирования найдена');
+        if (!isCreate && !isSuperuser) {
+            scanBtn.style.display = 'none';
+            console.log('Кнопка сканирования скрыта (не суперпользователь)');
+        } else {
+            console.log('Кнопка сканирования найдена');
+        }
     
     scanBtn.addEventListener('click', function(e) {
         e.preventDefault();

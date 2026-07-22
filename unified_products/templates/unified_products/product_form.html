@@ -35,6 +35,10 @@
     .sample-modal-info p:last-child {
         margin-bottom: 0;
     }
+    .readonly-title {
+        background-color: #e9ecef;
+        cursor: not-allowed;
+    }
 </style>
 {% endblock %}
 
@@ -103,10 +107,12 @@
                                     </label>
                                     <div class="input-group">
                                         {{ form.serial_number }}
+                                        {% if is_create or is_superuser %}
                                         <button type="button" class="btn btn-outline-secondary" id="scanSerialBtn">
                                             <i class="fas fa-camera scan-icon"></i>
                                             <i class="fas fa-spinner fa-spin spinner" style="display:none;"></i>
                                         </button>
+                                        {% endif %}
                                     </div>
                                     <div id="categoryDetectResult" class="category-detect-result mt-2" style="display: none;">
                                         <div class="alert alert-info">
@@ -217,9 +223,10 @@
                                                     <img src="" class="image-preview" style="display:none;">
                                                 {% endif %}
                                                 
-                                                <input type="text" class="title-input form-control form-control-sm" 
+                                                <input type="text" class="title-input form-control form-control-sm {% if image.has_sample_image %}readonly-title{% endif %}" 
                                                        value="{{ image.title|default:'' }}"
                                                        placeholder="Заголовок"
+                                                       {% if image.has_sample_image %}readonly{% endif %}
                                                        onchange="saveTitle({{ object.pk }}, {{ image.field_index }}, this)">
                                                 
                                                 <div class="d-flex gap-1 mt-1">
@@ -309,6 +316,20 @@
     console.log('isCreate:', window.isCreate);
     console.log('productId:', window.productId);
     console.log('categories:', window.categoriesData);
+    
+    // Если есть образец и заголовки подставлены, блокируем изменение
+    document.addEventListener('DOMContentLoaded', function() {
+        const readonlyTitles = document.querySelectorAll('.readonly-title');
+        readonlyTitles.forEach(function(input) {
+            input.addEventListener('keydown', function(e) {
+                e.preventDefault();
+            });
+            input.addEventListener('click', function(e) {
+                e.preventDefault();
+                alert('Заголовок подставлен из образца и не может быть изменен');
+            });
+        });
+    });
     console.log('===============================');
 </script>
 <script src="{% static 'unified_products/js/product_form.js' %}"></script>

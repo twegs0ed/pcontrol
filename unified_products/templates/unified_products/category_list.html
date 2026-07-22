@@ -23,7 +23,7 @@
                             <th>Кол-во фото</th>
                             <th>Статус</th>
                             <th>Изделий</th>
-                            <th>Образец</th>
+                            
                             <th>Действия</th>
                         </tr>
                     </thead>
@@ -43,18 +43,7 @@
                             <td>
                                 <span class="badge bg-info">{{ category.products.count }}</span>
                             </td>
-                            <td>
-                                {% with sample=category.sample %}
-                                    {% if sample %}
-                                        <a href="{% url 'unified_products:sample_detail' sample.pk %}" 
-                                           class="btn btn-sm btn-info">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                    {% else %}
-                                        <span class="text-muted">Нет</span>
-                                    {% endif %}
-                                {% endwith %}
-                            </td>
+                            
                             <td>
                                 <a href="{% url 'unified_products:category_edit' category.pk %}" 
                                    class="btn btn-sm btn-warning">

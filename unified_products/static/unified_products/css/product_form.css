@@ -251,3 +251,16 @@
         max-height: 50vh;
     }
 }
+
+/* ===== ЗАГОЛОВКИ ИЗ ОБРАЗЦА ===== */
+.title-input.readonly-title {
+    background-color: #e9ecef !important;
+    cursor: not-allowed;
+    opacity: 0.8;
+}
+
+.title-input.readonly-title:focus {
+    border-color: #6c757d;
+    box-shadow: none;
+    opacity: 0.8;
+}

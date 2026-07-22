@@ -199,7 +199,7 @@ def export_single_product_pdf(request, pk):
         elements = []
         
         # Заголовок
-        elements.append(Paragraph(f'Отчет по изделию: {product.serial_number}', title_style))
+        elements.append(Paragraph(f'Отчет по изделию: {product.category.name} s/n {product.serial_number}', title_style))
         elements.append(Spacer(1, 12))
         
         # ===== ИНФОРМАЦИЯ =====
@@ -210,7 +210,7 @@ def export_single_product_pdf(request, pk):
         info_data = [
             ['Параметр', 'Значение'],
             ['Серийный номер', product.serial_number],
-            ['Категория', product.category.name],
+            ['Изделие', product.category.name],
             ['Ответственный контролер', get_user_full_name(product.owner)],
             ['Статус', product.get_status_display()],
             ['Дата начала проверки', product.created_at.strftime("%d.%m.%Y %H:%M")],
@@ -252,16 +252,13 @@ def export_single_product_pdf(request, pk):
         images = product.images.filter(image__isnull=False).exclude(image='').order_by('field_index')
         
         if images.exists():
-            # Группируем изображения по 2 в ряд
-            image_rows = []
-            current_row = []
-            
+            # Каждое изображение в отдельной строке с отступами от краев
             for img in images:
                 try:
                     if img.image and hasattr(img.image, 'path') and img.image.path:
                         if os.path.exists(img.image.path) and os.path.getsize(img.image.path) > 0:
-                            # Создаем изображение
-                            img_obj = Image(img.image.path, width=3.5*inch, height=3.5*inch, kind='proportional')
+                            # Создаем таблицу для изображения с отступами
+                            img_obj = Image(img.image.path, width=5.5*inch, height=5.5*inch, kind='proportional')
                             
                             # Заголовок
                             title = Paragraph(
@@ -271,38 +268,29 @@ def export_single_product_pdf(request, pk):
                                     parent=normal_style,
                                     alignment=TA_CENTER,
                                     fontSize=10,
-                                    spaceAfter=4
+                                    spaceAfter=6
                                 )
                             )
                             
-                            # Создаем ячейку с заголовком и изображением
-                            cell_content = [title, img_obj]
-                            current_row.append(cell_content)
-                            
-                            if len(current_row) >= 2:
-                                image_rows.append(current_row)
-                                current_row = []
+                            # Ячейка с заголовком и изображением
+                            cell_content = [[title], [img_obj]]
+                            row_table = Table(cell_content, colWidths=[5.5*inch])
+                            row_table.setStyle(TableStyle([
+                                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                                ('SPACEBETWEEN', (0, 0), (-1, -1), 8),
+                                ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.whitesmoke),
+                            ]))
+                            elements.append(row_table)
+                            elements.append(Spacer(1, 12))
                 except Exception as e:
                     print(f"Ошибка подготовки изображения {img.field_index}: {e}")
                     continue
-            
-            if current_row:
-                image_rows.append(current_row)
-            
-            # Добавляем строки изображений
-            for row in image_rows:
-                # Создаем таблицу для строки
-                row_table = Table([row], colWidths=[4.5*inch] * len(row))
-                row_table.setStyle(TableStyle([
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                    ('TOPPADDING', (0, 0), (-1, -1), 6),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ]))
-                elements.append(row_table)
-                elements.append(Spacer(1, 8))
         else:
             elements.append(Paragraph('Нет загруженных фотографий', normal_style))
         
@@ -382,7 +370,7 @@ def export_single_product_word(request, pk):
         doc = Document()
         
         # Заголовок
-        title = doc.add_heading(f'Отчет по изделию: {product.serial_number}', 0)
+        title = doc.add_heading(f'Отчет по изделию: {product.category.name} s/n {product.serial_number}', 0)
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         # Основная информация
@@ -395,7 +383,7 @@ def export_single_product_word(request, pk):
         
         info = [
             ('Серийный номер:', product.serial_number),
-            ('Категория:', product.category.name),
+            ('Изделие:', product.category.name),
             ('Ответственный контролер:', get_user_full_name(product.owner)),
             ('Статус:', product.get_status_display()),
             ('Дата начала проверки:', product.created_at.strftime("%d.%m.%Y %H:%M")),
@@ -490,15 +478,79 @@ def export_single_product_word(request, pk):
             image_added = False
             for img in images:
                 title_text = img.title or f'Поле {img.field_index}'
-                doc.add_heading(title_text, level=2)
                 
-                if add_image_safe(doc, img.image, title_text, 4):
+                # Создаем таблицу для рамки (1 колонка, 2 строки: заголовок + изображение)
+                table = doc.add_table(rows=2, cols=1)
+                table.style = 'Table Grid'
+                
+                # Ячейка с заголовком
+                cell_title = table.cell(0, 0)
+                title_para = cell_title.paragraphs[0]
+                title_run = title_para.add_run(title_text)
+                title_run.bold = True
+                
+                # Ячейка с изображением
+                cell_img = table.cell(1, 0)
+                
+                # Добавляем изображение
+                try:
+                    if not img.image:
+                        raise Exception("Файл не найден")
+                    
+                    if hasattr(img.image, 'path') and img.image.path:
+                        image_path = img.image.path
+                    else:
+                        raise Exception("Ошибка пути файла")
+                    
+                    if not os.path.exists(image_path):
+                        raise Exception("Файл не найден")
+                    
+                    if os.path.getsize(image_path) == 0:
+                        raise Exception("Файл пустой")
+                    
+                    # Добавляем изображение в ячейку
+                    from docx.shared import Inches
+                    from PIL import Image as PILImage
+                    pil_img = PILImage.open(image_path)
+                    
+                    # Конвертируем в RGB если нужно
+                    if pil_img.mode in ('RGBA', 'LA', 'P'):
+                        rgb_img = PILImage.new('RGB', pil_img.size, (255, 255, 255))
+                        if pil_img.mode == 'P':
+                            pil_img = pil_img.convert('RGBA')
+                        if pil_img.mode in ('RGBA', 'LA'):
+                            rgb_img.paste(pil_img, mask=pil_img.split()[-1])
+                        else:
+                            rgb_img.paste(pil_img)
+                        pil_img = rgb_img
+                    elif pil_img.mode != 'RGB':
+                        pil_img = pil_img.convert('RGB')
+                    
+                    # Сохраняем в буфер
+                    img_buffer = io.BytesIO()
+                    pil_img.save(img_buffer, format='JPEG', quality=90)
+                    img_buffer.seek(0)
+                    
+                    # Добавляем из буфера
+                    cell_img.add_paragraph().add_run().add_picture(img_buffer, width=Inches(4))
+                    
+                    img_buffer.close()
+                    
                     image_added = True
+                except Exception as e:
+                    print(f"Ошибка добавления изображения: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    doc.add_paragraph(f'⚠️ Ошибка загрузки: {title_text}')
+                    continue
             
             if not image_added:
                 doc.add_paragraph('Не удалось добавить ни одного изображения')
         else:
             doc.add_paragraph('Нет загруженных фотографий')
+        
+        # Пустая строка между группами
+        doc.add_paragraph()
         
         # ===== ФОТО СЕРИЙНОГО НОМЕРА =====
         doc.add_heading('Фото серийного номера', level=1)
@@ -797,6 +849,7 @@ class ProductCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Создание изделия'
         context['is_create'] = True
+        context['is_superuser'] = self.request.user.is_superuser
         context['categories'] = Category.objects.filter(is_active=True)
         context['scan_url'] = '/unified-products/scan-serial/'
         context['app_name'] = 'Управление изделиями'
@@ -928,11 +981,10 @@ class ProductUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         try:
             obj = self.get_object()
             if obj.status in ['completed', 'closed']:
-                if self.request.user.groups.filter(name='Контролер').exists() or \
-                   self.request.user.groups.filter(name='Аудитор').exists():
+                if self.request.user.groups.filter(name='Контролер').exists():
                     messages.warning(
                         request,
-                        f'Изделие {obj.serial_number} уже завершено. Доступ только для просмотра.'
+                        f'Изделие {obj.serial_number} уже завершено. Редактирование заблокировано.'
                     )
                     return redirect('unified_products:product_detail', pk=obj.pk)
         except:
@@ -957,6 +1009,7 @@ class ProductUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context['can_edit'] = self.object.can_edit(self.request.user)
         context['is_completed'] = self.object.is_completed()
         context['is_closed'] = self.object.status == 'closed'
+        context['is_superuser'] = self.request.user.is_superuser
         context['scan_url'] = '/unified-products/scan-serial/'
         context['app_name'] = 'Управление изделиями'
         context['namespace'] = 'unified_products'
@@ -978,6 +1031,8 @@ class ProductUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         for image in context['images']:
             image.sample_image = sample_images.get(image.field_index)
             image.has_sample_image = image.sample_image and bool(image.sample_image.image)
+            if image.sample_image and not image.title:
+                image.title = image.sample_image.title
         
         return context
     
@@ -1168,10 +1223,11 @@ class ScanSerialView(LoginRequiredMixin, View):
             # Распознаем серийный номер
             detected_serial = None
             try:
-                from PIL import Image, ImageEnhance
+                from PIL import Image, ImageEnhance, ImageFilter
                 import pytesseract
                 import re
                 import sys
+                from collections import Counter
                 
                 # Настраиваем Tesseract
                 if sys.platform == 'win32':
@@ -1194,36 +1250,51 @@ class ScanSerialView(LoginRequiredMixin, View):
                 image = image.point(lambda p: 255 if p > 128 else 0)
                 width, height = image.size
                 image = image.resize((width * 3, height * 3), Image.Resampling.LANCZOS)
+                image = image.filter(ImageFilter.SHARPEN)
                 
                 configs = [
                     r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789',
                     r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789',
                     r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789',
+                    r'--oem 3 --psm 13 -c tessedit_char_whitelist=0123456789',
                 ]
                 
+                all_texts = []
                 for config in configs:
                     try:
                         text = pytesseract.image_to_string(image, lang='eng', config=config)
-                        text = re.sub(r'[^0-9]', '', text)
-                        print(f"Распознано с config {config}: {text}")
-                        if text:
-                            match = re.search(r'\d{6,8}', text)
-                            if match:
-                                detected_serial = match.group(0)
-                                print(f"Найден серийный номер: {detected_serial}")
-                                break
+                        text_clean = re.sub(r'[^0-9]', '', text)
+                        all_texts.append(text_clean)
+                        print(f"Распознано с config {config}: {text_clean}")
                     except Exception as e:
                         print(f"Ошибка с config {config}: {e}")
                 
+                all_found = []
+                patterns = [r'\d{7}', r'\d{6,8}']
+                for text in all_texts:
+                    for pattern in patterns:
+                        match = re.search(pattern, text)
+                        if match:
+                            all_found.append(match.group(0))
+                            print(f"Найден серийный номер (паттерн {pattern}): {match.group(0)}")
+                
+                if all_found:
+                    counter = Counter(all_found)
+                    detected_serial = counter.most_common(1)[0][0]
+                    print(f"Выбран серийный номер (самый частый): {detected_serial}")
+                
                 if not detected_serial:
-                    # Пробуем без ограничений
-                    text = pytesseract.image_to_string(image, lang='eng')
-                    text = re.sub(r'[^0-9]', '', text)
-                    print(f"Распознано без ограничений: {text}")
-                    match = re.search(r'\d{6,8}', text)
-                    if match:
-                        detected_serial = match.group(0)
-                        print(f"Найден серийный номер (без ограничений): {detected_serial}")
+                    print("Серийный номер не распознан с ограниченным набором")
+                    
+                    text_all = pytesseract.image_to_string(image, lang='eng')
+                    text_all_clean = re.sub(r'[^0-9]', '', text_all)
+                    print(f"Распознано без ограничений: {text_all_clean}")
+                    for pattern in patterns:
+                        match = re.search(pattern, text_all_clean)
+                        if match:
+                            detected_serial = match.group(0)
+                            print(f"Найден серийный номер (без ограничений, паттерн {pattern}): {detected_serial}")
+                            break
                         
             except Exception as e:
                 print(f"Ошибка распознавания: {e}")
