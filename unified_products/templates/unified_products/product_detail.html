@@ -119,12 +119,34 @@
             {% if product.serial_photo %}
                 <div class="mb-4">
                     <h5><i class="fas fa-image"></i> Фото серийного номера</h5>
-                    <img src="{{ product.serial_photo.url }}" 
-                         alt="Фото серийного номера" 
-                         class="img-thumbnail" 
-                         style="max-height: 200px;">
+                    <a href="{{ product.serial_photo.url }}" data-bs-toggle="modal" data-bs-target="#serialPhotoModal">
+                        <img src="{{ product.serial_photo.url }}" 
+                             alt="Фото серийного номера" 
+                             class="img-thumbnail cursor-pointer" 
+                             style="max-height: 200px;">
+                    </a>
                 </div>
             {% endif %}
+            
+            <!-- Модальное окно для фото серийного номера -->
+            <div class="modal fade" id="serialPhotoModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark text-white">
+                        <div class="modal-header border-0">
+                            <h5 class="modal-title">Фото серийного номера</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            {% if product.serial_photo %}
+                                <img src="{{ product.serial_photo.url }}" class="img-fluid" alt="Фото серийного номера">
+                            {% endif %}
+                        </div>
+                        <div class="modal-footer border-0">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <!-- Изображения -->
             <h5><i class="fas fa-images"></i> Изображения изделия</h5>
@@ -135,10 +157,12 @@
                             <div class="card-body text-center">
                                 <h6 class="card-title">{{ image.title|default:"Поле "|add:image.field_index }}</h6>
                                 {% if image.image %}
-                                    <img src="{{ image.image.url }}" 
-                                         alt="{{ image.title }}" 
-                                         class="img-fluid rounded" 
-                                         style="max-height: 150px; object-fit: cover;">
+                                    <a href="#" class="image-link" data-bs-toggle="modal" data-bs-target="#imageModal" data-index="{{ forloop.counter0 }}">
+                                        <img src="{{ image.image.url }}" 
+                                             alt="{{ image.title }}" 
+                                             class="img-fluid rounded" 
+                                             style="max-height: 150px; object-fit: cover;">
+                                    </a>
                                 {% else %}
                                     <div class="text-muted py-4">
                                         <i class="fas fa-image fa-3x"></i>
@@ -150,6 +174,51 @@
                     </div>
                 {% endfor %}
             </div>
+            
+            <!-- Модальное окно для просмотра изображений -->
+            <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-centered">
+                    <div class="modal-content bg-dark text-white">
+                        <div class="modal-header border-0">
+                            <h5 class="modal-title" id="imageModalTitle"></h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                        </div>
+                        <div class="modal-body p-0">
+                            <div id="imageCarousel" class="carousel slide" data-bs-interval="false">
+                                <div class="carousel-inner" id="carouselInner">
+                                    {% for image in images %}
+                                        <div class="carousel-item {% if forloop.first %}active{% endif %}" data-index="{{ forloop.counter0 }}">
+                                            {% if image.image %}
+                                                <img src="{{ image.image.url }}" class="d-block w-100 object-fit-contain" style="max-height: 70vh;" alt="{{ image.title }}">
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <button class="carousel-control-prev" type="button" data-bs-target="#imageCarousel" data-bs-slide="prev">
+                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Предыдущее</span>
+                                </button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#imageCarousel" data-bs-slide="next">
+                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Следующее</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <style>
+                .object-fit-contain {
+                    object-fit: contain;
+                }
+                .cursor-pointer {
+                    cursor: pointer;
+                }
+            </style>
             
             <!-- Кнопки -->
             <div class="d-flex justify-content-between mt-4">
@@ -181,3 +250,93 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const imageLinks = document.querySelectorAll('.image-link');
+    const imageModal = document.getElementById('imageModal');
+    const carouselInner = document.getElementById('carouselInner');
+    const imageModalTitle = document.getElementById('imageModalTitle');
+    const imageCarousel = document.getElementById('imageCarousel');
+    
+    if (imageLinks.length > 0 && imageModal && imageCarousel && imageModalTitle) {
+        imageLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const index = this.dataset.index;
+                showImage(index);
+            });
+        });
+        
+        function showImage(index) {
+            const items = carouselInner.querySelectorAll('.carousel-item');
+            
+            items.forEach((item, i) => {
+                if (i === parseInt(index)) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            
+            const activeItem = items[parseInt(index)];
+            const imageTitle = activeItem.querySelector('img')?.alt || '';
+            imageModalTitle.textContent = imageTitle;
+            
+            if (imageCarousel) {
+                const carousel = bootstrap.Carousel.getOrCreateInstance(imageCarousel);
+                carousel.pause();
+                carousel.to(parseInt(index));
+            }
+        }
+        
+        if (imageCarousel) {
+            const carousel = bootstrap.Carousel.getOrCreateInstance(imageCarousel);
+            console.log('Carousel initialized');
+            
+            const modalBody = imageModal.querySelector('.modal-body');
+            
+            modalBody.addEventListener('slide.bs.carousel', function(event) {
+                console.log('Slide event on modalBody, next index:', event.to);
+            });
+            
+            modalBody.addEventListener('slid.bs.carousel', function(event) {
+                console.log('Slid event on modalBody');
+                updateTitle();
+            });
+            
+            imageCarousel.addEventListener('slide.bs.carousel', function(event) {
+                console.log('Slide event on imageCarousel, next index:', event.to);
+            });
+            
+            imageCarousel.addEventListener('slid.bs.carousel', function(event) {
+                console.log('Slid event on imageCarousel, active index:', carousel.getItemIndex(carousel.getActiveItem()));
+                updateTitle();
+            });
+            
+            function updateTitle() {
+                const activeItem = carouselInner.querySelector('.carousel-item.active');
+                if (activeItem && activeItem.querySelector('img')) {
+                    const imageTitle = activeItem.querySelector('img').alt || '';
+                    console.log('New title:', imageTitle);
+                    imageModalTitle.textContent = imageTitle;
+                }
+            }
+        }
+        
+        imageModal.addEventListener('shown.bs.modal', function() {
+            const activeItem = carouselInner.querySelector('.carousel-item.active');
+            if (activeItem && activeItem.querySelector('img')) {
+                const imageTitle = activeItem.querySelector('img').alt || '';
+                imageModalTitle.textContent = imageTitle;
+            }
+            if (window.location.hash) {
+                const index = window.location.hash.substring(1);
+                showImage(index);
+            }
+        });
+    }
+});
+</script>
+{% endblock extra_js %}

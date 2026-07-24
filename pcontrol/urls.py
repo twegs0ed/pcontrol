@@ -25,18 +25,13 @@ from . import views
 
 
 urlpatterns = [
+    path('admin/', admin.site.urls),
     path('', include('pcontrol_app.urls')),
-    #path('pcontrol/', include('pcontrol_app.urls')),
-    path('pcontrol/', include('pcontrol_app.urls')),
-    #path('', index, name='index'),  # главная страница
-    path('gs14/', include('gs14.urls')),
-    path('kt08_9a/', include('kt08_9a.urls')),
     # Авторизация
     path('login/', auth_views.LoginView.as_view(
         template_name='registration/login.html'
     ), name='login'),
     path('logout/', custom_logout, name='logout'),
-    path('ttr_10ab/', include('ttr_10ab.urls')),
     path('unified-products/', include('unified_products.urls')),
     path('scan-serial/', include('unified_products.urls')),  # ✅ Для совместимости
     
