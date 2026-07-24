@@ -27,6 +27,7 @@ from . import views
 urlpatterns = [
     path('', include('pcontrol_app.urls')),
     #path('pcontrol/', include('pcontrol_app.urls')),
+    path('pcontrol/', include('pcontrol_app.urls')),
     #path('', index, name='index'),  # главная страница
     path('gs14/', include('gs14.urls')),
     path('kt08_9a/', include('kt08_9a.urls')),
