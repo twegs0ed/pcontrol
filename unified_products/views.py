@@ -711,8 +711,9 @@ class ProductListView(LoginRequiredMixin, ListView):
             qs = qs.filter(status=status_filter)
         
         # ===== ФИЛЬТР ПО ВЛАДЕЛЬЦУ (ПОИСК) =====
-        owner_search = self.request.GET.get('owner_search')
+        owner_search = self.request.GET.get('owner_search', '').strip()
         if owner_search:
+            # Простой поиск по username, first_name, last_name
             qs = qs.filter(
                 models.Q(owner__username__icontains=owner_search) |
                 models.Q(owner__first_name__icontains=owner_search) |

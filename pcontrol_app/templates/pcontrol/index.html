@@ -3,13 +3,13 @@
 {% load static %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container-fluid mt-3">
     <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
+        <div class="col-12 col-md-10 col-lg-8">
             <div class="card shadow">
-                <div class="card-body p-5">
-                    <h1 class="text-center mb-4">
-                        <i class="fas fa-search"></i> Поиск изделия
+                <div class="card-body p-3 p-md-4 p-lg-5">
+                    <h1 class="text-center mb-3 mb-md-4">
+                        <i class="fas fa-search"></i> <span class="d-none d-md-inline">Поиск изделия</span>
                     </h1>
                     
                     <!-- ===== БЛОК ДЛЯ СООБЩЕНИЙ ===== -->
@@ -29,23 +29,23 @@
                     <form id="search-form" method="post" action="{% url 'pcontrol:index' %}">
                         {% csrf_token %}
                         
-                        <div class="input-group input-group-lg mb-3">
+                        <div class="input-group mb-2 mb-md-3">
                             <input type="text" 
-                                   class="form-control" 
+                                   class="form-control form-control-lg" 
                                    id="serial_number" 
                                    name="serial_number" 
                                    placeholder="Введите серийный номер" 
                                    autocomplete="off"
                                    required>
                             
-                            <button class="btn btn-primary" 
+                            <button class="btn btn-primary btn-lg" 
                                     type="submit" 
                                     id="searchBtn" 
                                     disabled>
-                                <i class="fas fa-search"></i> Поиск
+                                <i class="fas fa-search"></i> <span class="d-none d-sm-inline">Поиск</span>
                             </button>
                             
-                            <button class="btn btn-outline-secondary" 
+                            <button class="btn btn-outline-secondary btn-lg" 
                                     type="button" 
                                     id="cameraBtn">
                                 <i class="fas fa-camera camera-icon"></i>
@@ -58,12 +58,13 @@
                         </div>
                         
                         <!-- ПРИМЕРЫ (из активных категорий) -->
-                        <div class="examples text-center">
-                            <small class="text-muted d-block mb-2">Примеры серийных номеров:</small>
+                        <div class="examples text-center mb-2">
+                            <small class="text-muted d-block mb-2">Примеры:</small>
                             {% for category in categories %}
                                 <span class="example-badge badge bg-secondary" 
-                                      data-serial="{{ category.prefix }}12345">
-                                    {{ category.prefix }}... ({{ category.name }})
+                                      data-serial="{{ category.prefix }}12345"
+                                      style="font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+                                    {{ category.prefix }}... <span class="d-none d-md-inline">({{ category.name }})</span>
                                 </span>
                             {% empty %}
                                 <span class="text-muted">Нет активных категорий</span>
@@ -73,15 +74,15 @@
                     
                     <!-- ===== СТАТИСТИКА ===== -->
                     {% if total_products > 0 %}
-                        <div class="mt-4 text-center text-muted small">
+                        <div class="mt-3 text-center text-muted small">
                             <i class="fas fa-database"></i> 
                             Всего изделий: {{ total_products }}
                             {% if total_completed > 0 %}
-                                | <i class="fas fa-check-circle text-success"></i> 
+                                <span class="mx-1">|</span> <i class="fas fa-check-circle text-success"></i> 
                                 Завершено: {{ total_completed }}
                             {% endif %}
                             {% if total_in_progress > 0 %}
-                                | <i class="fas fa-spinner text-primary"></i> 
+                                <span class="mx-1">|</span> <i class="fas fa-spinner text-primary"></i> 
                                 В процессе: {{ total_in_progress }}
                             {% endif %}
                         </div>

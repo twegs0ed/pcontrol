@@ -4,42 +4,45 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'unified_products/css/product_form.css' %}">
-<style>
-    .sample-btn {
-        flex-shrink: 0;
-        min-width: 32px;
-        height: 32px;
-        padding: 0 8px;
-        font-size: 13px;
-        transition: all 0.3s;
-    }
-    .sample-btn:hover {
-        transform: scale(1.1);
-    }
-    .sample-modal-image {
-        max-height: 70vh;
-        max-width: 100%;
-        object-fit: contain;
-        border-radius: 8px;
-    }
-    .sample-modal-info {
-        background: #f8f9fa;
-        padding: 12px 15px;
-        border-radius: 6px;
-        font-size: 14px;
-        margin-top: 15px;
-    }
-    .sample-modal-info p {
-        margin-bottom: 4px;
-    }
-    .sample-modal-info p:last-child {
-        margin-bottom: 0;
-    }
-    .readonly-title {
-        background-color: #e9ecef;
-        cursor: not-allowed;
-    }
-</style>
+            <style>
+                .sample-btn {
+                    flex-shrink: 0;
+                    min-width: 32px;
+                    height: 32px;
+                    padding: 0 8px;
+                    font-size: 13px;
+                    transition: all 0.3s;
+                }
+                .sample-btn:hover {
+                    transform: scale(1.1);
+                }
+                .sample-modal-image {
+                    max-height: 70vh;
+                    max-width: 100%;
+                    object-fit: contain;
+                    border-radius: 8px;
+                }
+                .sample-modal-info {
+                    background: #f8f9fa;
+                    padding: 12px 15px;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    margin-top: 15px;
+                }
+                .sample-modal-info p {
+                    margin-bottom: 4px;
+                }
+                .sample-modal-info p:last-child {
+                    margin-bottom: 0;
+                }
+                .readonly-title {
+                    background-color: #e9ecef;
+                    cursor: not-allowed;
+                }
+                .cursor-pointer {
+                    cursor: pointer;
+                }
+            </style>
 {% endblock %}
 
 {% block content %}
@@ -212,16 +215,38 @@
                                                     {% if image.image %}Загружено{% else %}Пусто{% endif %}
                                                 </span>
                                                 
-                                                {% if image.image %}
-                                                    <button type="button" class="btn btn-sm btn-danger delete-btn" 
-                                                            onclick="deleteImage({{ object.pk }}, {{ image.field_index }})">
-                                                        <i class="fas fa-times"></i>
-                                                    </button>
-                                                    <img src="{{ image.image.url }}" class="image-preview" alt="{{ image.title|default:'Изображение' }}">
-                                                {% else %}
-                                                    <div class="placeholder"><i class="fas fa-image"></i></div>
-                                                    <img src="" class="image-preview" style="display:none;">
-                                                {% endif %}
+                                    {% if image.image %}
+                                        <button type="button" class="btn btn-sm btn-danger delete-btn" 
+                                                onclick="deleteImage({{ object.pk }}, {{ image.field_index }})">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                        <a href="{{ image.image.url }}" data-bs-toggle="modal" data-bs-target="#imageModal{{ image.field_index }}" class="cursor-pointer">
+                                            <img src="{{ image.image.url }}" class="image-preview" alt="{{ image.title|default:'Изображение' }}">
+                                        </a>
+                                    {% else %}
+                                        <div class="placeholder"><i class="fas fa-image"></i></div>
+                                        <img src="" class="image-preview" style="display:none;">
+                                    {% endif %}
+                                    
+                                    <!-- ===== МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА ИЗОБРАЖЕНИЯ ===== -->
+                                    {% if image.image %}
+                                        <div class="modal fade" id="imageModal{{ image.field_index }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content bg-dark text-white">
+                                                    <div class="modal-header border-0">
+                                                        <h5 class="modal-title">{{ image.title|default:"Поле "|add:image.field_index }}</h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center">
+                                                        <img src="{{ image.image.url }}" class="img-fluid" alt="{{ image.title|default:'Изображение' }}">
+                                                    </div>
+                                                    <div class="modal-footer border-0">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
                                                 
                                                 <input type="text" class="title-input form-control form-control-sm {% if image.has_sample_image %}readonly-title{% endif %}" 
                                                        value="{{ image.title|default:'' }}"
@@ -262,34 +287,34 @@
                                         </div>
                                         
                                         <!-- ===== МОДАЛЬНОЕ ОКНО ДЛЯ ПРИМЕРА ===== -->
-                                        {% if image.has_sample_image %}
-                                            <div class="modal fade" id="sampleModal{{ image.field_index }}" tabindex="-1">
-                                                <div class="modal-dialog modal-lg modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header bg-warning text-dark">
-                                                            <h5 class="modal-title">
-                                                                <i class="fas fa-star"></i>
-                                                                Пример: {{ image.sample_image.title|default:"Поле "|add:image.field_index }}
-                                                            </h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    {% if image.has_sample_image %}
+                                        <div class="modal fade" id="sampleModal{{ image.field_index }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-lg modal-dialog-centered">
+                                                <div class="modal-content bg-dark text-white">
+                                                    <div class="modal-header bg-warning text-dark border-0">
+                                                        <h5 class="modal-title">
+                                                            <i class="fas fa-star"></i>
+                                                            Пример: {{ image.sample_image.title|default:"Поле "|add:image.field_index }}
+                                                        </h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center">
+                                                        <img src="{{ image.sample_image.image.url }}" 
+                                                             class="sample-modal-image img-fluid" 
+                                                             alt="{{ image.sample_image.title|default:'Пример' }}">
+                                                        <div class="sample-modal-info text-start" style="background: #f8f9fa; padding: 12px 15px; border-radius: 6px; margin-top: 15px;">
+                                                            <p><strong>Категория:</strong> {{ sample.category.name }}</p>
+                                                            <p><strong>Образец:</strong> {{ sample.serial_number }}</p>
+                                                            <p><strong>Заголовок:</strong> {{ image.sample_image.title|default:"Без заголовка" }}</p>
                                                         </div>
-                                                        <div class="modal-body text-center">
-                                                            <img src="{{ image.sample_image.image.url }}" 
-                                                                 class="sample-modal-image img-fluid" 
-                                                                 alt="{{ image.sample_image.title|default:'Пример' }}">
-                                                            <div class="sample-modal-info text-start">
-                                                                <p><strong>Категория:</strong> {{ sample.category.name }}</p>
-                                                                <p><strong>Образец:</strong> {{ sample.serial_number }}</p>
-                                                                <p><strong>Заголовок:</strong> {{ image.sample_image.title|default:"Без заголовка" }}</p>
-                                                            </div>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-0">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
                                                     </div>
                                                 </div>
                                             </div>
-                                        {% endif %}
+                                        </div>
+                                    {% endif %}
                                     {% endfor %}
                                 </div>
                             </div>
