@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (searchBtn) searchBtn.disabled = true;
         
         // ИСПРАВЛЕННЫЙ URL - используем полный путь
-        const url = '/check-serial-ajax/?serial=' + encodeURIComponent(serial);
+        const url = '/pcontrol/check-serial-ajax/?serial=' + encodeURIComponent(serial);
         
         console.log('AJAX запрос к:', url);
         
