@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">
+                <i class="fas fa-ruler-combined"></i>
+                {% if record %}Редактирование записи{% else %}Новая запись контроля{% endif %}
+            </h4>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" id="controlForm">
+                {% csrf_token %}
+
+                <!-- Основные поля -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Контролер</label>
+                    <div class="form-control bg-light">
+                        {% if request.user.get_full_name %}
+                            {{ request.user.get_full_name }}
+                        {% else %}
+                            {{ request.user.username }}
+                        {% endif %}
+                    </div>
+                    <small class="text-muted">Определяется автоматически</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Дата и время контроля</label>
+                    <div class="form-control bg-light">
+                        {% if record %}{{ record.control_date|date:"d.m.Y H:i" }}{% else %}Определяется автоматически{% endif %}
+                    </div>
+                    <small class="text-muted">Сохраняется автоматически</small>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.worker.id_for_label }}" class="form-label fw-bold">ФИО рабочего <span class="text-danger">*</span></label>
+                        {{ form.worker }}
+                        {% if form.worker.errors %}
+                            <div class="text-danger small">{{ form.worker.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.batch_size.id_for_label }}" class="form-label fw-bold">Количество предъявленных деталей <span class="text-danger">*</span></label>
+                        {{ form.batch_size }}
+                        {% if form.batch_size.errors %}
+                            <div class="text-danger small">{{ form.batch_size.errors }}</div>
+                        {% endif %}
+                        <small class="text-muted">Проверяется не менее 5% от партии, но не менее 5 деталей</small>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.shift_photo.id_for_label }}" class="form-label fw-bold">Фото сменного задания</label>
+                    {{ form.shift_photo }}
+                    {% if form.shift_photo.errors %}
+                        <div class="text-danger small">{{ form.shift_photo.errors }}</div>
+                    {% endif %}
+                    <small class="text-muted">Загрузите фото сменного задания (допустимые форматы: JPG, PNG)</small>
+
+                    {% if record and record.shift_photo %}
+                        <div class="mt-2">
+                            <a href="{{ record.shift_photo.url }}" target="_blank">
+                                <img src="{{ record.shift_photo.url }}" alt="Сменное задание" class="img-thumbnail" style="max-height: 150px;">
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label fw-bold">Примечания</label>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}
+                        <div class="text-danger small">{{ form.notes.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Кнопка добавления детали -->
+                <hr>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0"><i class="fas fa-layer-group"></i> Детали</h5>
+                    <button type="button" class="btn btn-sm btn-success" id="addDetailBtn">
+                        <i class="fas fa-plus"></i> Добавить деталь
+                    </button>
+                </div>
+                <p class="text-muted small">Каждая деталь проверяет не менее 5% от партии (минимум 5 размеров)</p>
+
+                <div id="detailsContainer">
+                    <!-- Детали будут добавляться через JS -->
+                </div>
+
+                <!-- Кнопки -->
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% if record %}{% url 'controller:control_detail' record.pk %}{% else %}{% url 'controller:control_list' %}{% endif %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Отмена
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        {% if record %}Сохранить изменения{% else %}Сохранить{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let detailCount = 0;
+
+function addDetail(existingDetail = null) {
+    const container = document.getElementById('detailsContainer');
+    const detailNum = detailCount;
+    
+    const detailDiv = document.createElement('div');
+    detailDiv.className = 'card mb-3 detail-item';
+    detailDiv.dataset.detailId = detailNum;
+    
+    let html = `
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <strong>Деталь ${detailNum + 1}</strong>
+            <button type="button" class="btn btn-sm btn-danger remove-detail">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <div class="card-body">
+            <input type="hidden" name="detail_${detailNum}_dim_count" value="5" class="dim-count">
+            <input type="hidden" name="detail_${detailNum}_detail_number" value="${detailNum + 1}">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 60px;">№</th>
+                            <th>Значение размера</th>
+                            <th style="width: 150px;">Допуск</th>
+                            <th style="width: 120px;">Принимаемый</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="dimensions-body">
+    `;
+    
+    // Если это существующая деталь с размерами
+    if (existingDetail) {
+        for (let i = 0; i < existingDetail.dimensions.length; i++) {
+            const dim = existingDetail.dimensions[i];
+            html += createDimensionRow(detailNum, i, dim);
+        }
+        detailDiv.querySelector('.dim-count').value = existingDetail.dimensions.length;
+    } else {
+        // Новые размеры
+        for (let i = 0; i < 5; i++) {
+            html += createDimensionRow(detailNum, i, null);
+        }
+    }
+    
+    html += `
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary add-dimension">
+                <i class="fas fa-plus"></i> Добавить размер
+            </button>
+        </div>
+    `;
+    
+    detailDiv.innerHTML = html;
+    container.appendChild(detailDiv);
+    
+    // Обработчики событий
+    detailDiv.querySelector('.remove-detail').addEventListener('click', function() {
+        detailDiv.remove();
+        renumberDetails();
+    });
+    
+    detailDiv.querySelector('.add-dimension').addEventListener('click', function() {
+        addDimension(detailNum, this);
+    });
+    
+    detailCount++;
+    updateDetailNumbers();
+}
+
+function createDimensionRow(detailNum, dimIndex, dimData) {
+    const value = dimData ? dimData.value : '';
+    const tolerance = dimData ? dimData.tolerance : '';
+    const acceptable = dimData ? dimData.is_acceptable : true;
+    
+    return `
+        <tr>
+            <td class="text-center fw-bold dim-index">${dimIndex + 1}</td>
+            <td>
+                <input type="text" name="detail_${detailNum}_dim_${dimIndex}_value" class="form-control dim-value" value="${value}" placeholder="Значение">
+                <input type="hidden" name="detail_${detailNum}_dim_${dimIndex}_number" value="${dimIndex + 1}">
+            </td>
+            <td>
+                <input type="text" name="detail_${detailNum}_dim_${dimIndex}_tolerance" class="form-control dim-tolerance" value="${tolerance}" placeholder="Допуск">
+            </td>
+            <td>
+                <div class="form-check">
+                    <input class="form-check-input dim-acceptable" type="checkbox" name="detail_${detailNum}_dim_${dimIndex}_acceptable" ${acceptable ? 'checked' : ''}>
+                </div>
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-dimension">
+                    <i class="fas fa-times"></i>
+                </button>
+            </td>
+        </tr>
+    `;
+}
+
+function addDimension(detailNum, btn) {
+    const tbody = btn.previousElementSibling;
+    const dimIndex = tbody.querySelectorAll('tr').length;
+    
+    const row = document.createElement('tr');
+    row.innerHTML = createDimensionRow(detailNum, dimIndex, null);
+    tbody.appendChild(row);
+    
+    // Обновить индекс
+    row.querySelector('.dim-index').textContent = dimIndex + 1;
+    row.querySelector('.dim-value').name = `detail_${detailNum}_dim_${dimIndex}_value`;
+    row.querySelector('.dim-value').previousElementSibling.value = dimIndex + 1;
+    row.querySelector('.dim-tolerance').name = `detail_${detailNum}_dim_${dimIndex}_tolerance`;
+    row.querySelector('.dim-acceptable').name = `detail_${detailNum}_dim_${dimIndex}_acceptable`;
+    
+    // Обновить счетчик
+    const detailDiv = btn.closest('.detail-item');
+    detailDiv.querySelector('.dim-count').value = tbody.querySelectorAll('tr').length;
+    
+    // Добавить обработчик удаления
+    row.querySelector('.remove-dimension').addEventListener('click', function() {
+        row.remove();
+        renumberDimensions(detailNum);
+        detailDiv.querySelector('.dim-count').value = tbody.querySelectorAll('tr').length;
+    });
+}
+
+function renumberDimensions(detailNum) {
+    const tbody = document.querySelector(`.detail-item[data-detail-id="${detailNum}"] .dimensions-body`);
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((row, index) => {
+        row.querySelector('.dim-index').textContent = index + 1;
+        row.querySelector('.dim-value').previousElementSibling.value = index + 1;
+    });
+}
+
+function renumberDetails() {
+    const details = document.querySelectorAll('.detail-item');
+    details.forEach((detail, index) => {
+        detail.querySelector('.card-header strong').textContent = `Деталь ${index + 1}`;
+        detail.querySelector('.remove-detail').dataset.detailId = index;
+    });
+}
+
+function updateDetailNumbers() {
+    const details = document.querySelectorAll('.detail-item');
+    details.forEach((detail, index) => {
+        detail.querySelector('.card-header strong').textContent = `Деталь ${index + 1}`;
+        detail.querySelector('[name$="_detail_number"]').value = index + 1;
+    });
+}
+
+// Загрузка существующих деталей (группируем размеры по detail_number)
+{% if record and record.dimensions.exists %}
+    const detailsMap = {};
+    {% for dim in record.dimensions.all %}
+    if (!detailsMap[{{ dim.detail_number }}]) {
+        detailsMap[{{ dim.detail_number }}] = { dimensions: [] };
+    }
+    detailsMap[{{ dim.detail_number }}].dimensions.push({
+        value: '{{ dim.value|escapejs }}',
+        tolerance: '{{ dim.tolerance|escapejs }}',
+        is_acceptable: {% if dim.is_acceptable %}true{% else %}false{% endif %}
+    });
+    {% endfor %}
+    
+    Object.keys(detailsMap).forEach(function(key) {
+        addDetail(detailsMap[key]);
+    });
+{% endif %}
+
+// Инициализация
+document.getElementById('addDetailBtn').addEventListener('click', function() {
+    addDetail();
+});
+
+// Если это новая запись и нет деталей, добавить одну
+{% if not record %}
+    addDetail();
+{% endif %}
+</script>
+{% endblock %}

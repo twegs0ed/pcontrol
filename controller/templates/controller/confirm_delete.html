@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-danger text-white">
+            <h4 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Подтверждение удаления</h4>
+        </div>
+        <div class="card-body">
+            <p class="lead">Вы уверены, что хотите удалить запись контроля для рабочего <strong>{{ record.worker }}</strong>?</p>
+            <p class="text-muted">Дата: {{ record.control_date|date:"d.m.Y H:i" }}</p>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'controller:control_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Отмена
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Удалить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

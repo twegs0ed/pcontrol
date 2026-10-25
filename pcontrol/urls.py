@@ -33,10 +33,7 @@ urlpatterns = [
     ), name='login'),
     path('logout/', custom_logout, name='logout'),
     path('unified-products/', include('unified_products.urls')),
-    path('scan-serial/', include('unified_products.urls')),  # ✅ Для совместимости
-    
-    
-
+    path('controller/', include('controller.urls')),
 ]
 
 if settings.DEBUG:
