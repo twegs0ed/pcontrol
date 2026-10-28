@@ -85,7 +85,7 @@ class ProductAdmin(admin.ModelAdmin):
     
     def is_sample_display(self, obj):
         if obj.is_sample:
-            return format_html('<span class="badge bg-warning text-dark">⭐ Образец</span>')
+            return format_html('<span class="badge bg-warning text-dark">⭐ Образец</span>', '')
         return '-'
     is_sample_display.short_description = 'Образец'
     
