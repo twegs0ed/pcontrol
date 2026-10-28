@@ -1,5 +1,5 @@
 from django import forms
-from .models import ControlRecord, DimensionRecord
+from .models import ControlRecord
 
 
 class ControlRecordForm(forms.ModelForm):

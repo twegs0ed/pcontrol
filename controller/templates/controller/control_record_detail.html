@@ -93,22 +93,24 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for dim in record.dimensions.all %}
-                                <tr>
-                                    <td class="text-center fw-bold">{{ dim.detail_number }}</td>
-                                    <td class="text-center fw-bold">{{ dim.dimension_number }}</td>
-                                    <td><strong>{{ dim.value }}</strong></td>
-                                    <td>{{ dim.tolerance|default:"-" }}</td>
-                                    <td>
-                                        {% if dim.is_acceptable == True %}
-                                            <span class="badge bg-success">Принимаемый</span>
-                                        {% elif dim.is_acceptable == False %}
-                                            <span class="badge bg-danger">Не принимаемый</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">Не определен</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
+                                {% for group in record.groups.all %}
+                                    {% for dim in group.dimensions.all %}
+                                    <tr>
+                                        <td class="text-center fw-bold">{{ dim.detail_number }}</td>
+                                        <td class="text-center fw-bold">{{ dim.dimension_number }}</td>
+                                        <td><strong>{{ dim.value }}</strong></td>
+                                        <td>{{ dim.tolerance|default:"-" }}</td>
+                                        <td>
+                                            {% if dim.is_acceptable == True %}
+                                                <span class="badge bg-success">Принимаемый</span>
+                                            {% elif dim.is_acceptable == False %}
+                                                <span class="badge bg-danger">Не принимаемый</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Не определен</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
                                 {% empty %}
                                 <tr>
                                     <td colspan="5" class="text-center text-muted">Размеры не указаны</td>

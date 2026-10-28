@@ -95,8 +95,8 @@ class ProductAdmin(admin.ModelAdmin):
         percent = obj.get_progress_percent()
         color = 'green' if filled >= required else 'orange'
         return format_html(
-            '<span style="color: {};">{}/{} ({:n}%)</span>',
-            color, filled, required, percent
+            '<span style="color: {};">{}/{} ({}%)</span>',
+            color, filled, required, int(percent)
         )
     progress_display.short_description = 'Прогресс'
     

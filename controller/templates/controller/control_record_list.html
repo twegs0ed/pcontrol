@@ -75,7 +75,7 @@
                                 <span class="badge bg-info">{{ record.batch_size }} шт</span>
                             </td>
                             <td>
-                                <span class="badge bg-primary">{{ record.dimensions.values_list('detail_number', flat=True)|length }} шт</span>
+                                <span class="badge bg-primary">{{ record.total_details }} шт</span>
                             </td>
                             <td>
                                 {% if record.rejected_count > 0 %}

@@ -3,13 +3,18 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
 
+from django.db.models import Count
+
 from .models import ControlRecord, DimensionGroup, DimensionRecord
 from .forms import ControlRecordForm
 
 
 @login_required
 def control_list(request):
-    qs = ControlRecord.objects.select_related('controller').all()
+    qs = ControlRecord.objects.select_related('controller').annotate(
+        total_dimensions=Count('groups__dimensions'),
+        total_details=Count('groups', distinct=True)
+    ).order_by('-control_date')
 
     worker_filter = request.GET.get('worker', '').strip()
     if worker_filter:

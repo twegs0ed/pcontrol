@@ -128,6 +128,9 @@ function addDetail(existingDetail = null) {
         <div class="card-body">
             <input type="hidden" name="detail_${detailNum}_dim_count" value="5" class="dim-count">
             <input type="hidden" name="detail_${detailNum}_detail_number" value="${detailNum + 1}">
+            <button type="button" class="btn btn-sm btn-outline-secondary add-dimension mb-3">
+                <i class="fas fa-plus"></i> Добавить размер
+            </button>
             <div class="table-responsive">
                 <table class="table table-bordered">
                     <thead class="table-light">
@@ -148,7 +151,6 @@ function addDetail(existingDetail = null) {
             const dim = existingDetail.dimensions[i];
             html += createDimensionRow(detailNum, i, dim);
         }
-        detailDiv.querySelector('.dim-count').value = existingDetail.dimensions.length;
     } else {
         // Новые размеры
         for (let i = 0; i < 5; i++) {
@@ -160,14 +162,17 @@ function addDetail(existingDetail = null) {
                     </tbody>
                 </table>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-secondary add-dimension">
-                <i class="fas fa-plus"></i> Добавить размер
-            </button>
         </div>
     `;
     
     detailDiv.innerHTML = html;
-    container.appendChild(detailDiv);
+    
+    // Если это существующая деталь с размерами
+    if (existingDetail) {
+        detailDiv.querySelector('.dim-count').value = existingDetail.dimensions.length;
+    }
+    
+    container.prepend(detailDiv);
     
     // Обработчики событий
     detailDiv.querySelector('.remove-detail').addEventListener('click', function() {
@@ -213,19 +218,21 @@ function createDimensionRow(detailNum, dimIndex, dimData) {
 }
 
 function addDimension(detailNum, btn) {
-    const tbody = btn.previousElementSibling;
+    const tbody = btn.nextElementSibling.querySelector('.dimensions-body');
     const dimIndex = tbody.querySelectorAll('tr').length;
+    const displayNumber = dimIndex + 1; // Номер нового размера (N+1)
     
     const row = document.createElement('tr');
     row.innerHTML = createDimensionRow(detailNum, dimIndex, null);
-    tbody.appendChild(row);
+    tbody.prepend(row);
     
-    // Обновить индекс
-    row.querySelector('.dim-index').textContent = dimIndex + 1;
-    row.querySelector('.dim-value').name = `detail_${detailNum}_dim_${dimIndex}_value`;
-    row.querySelector('.dim-value').previousElementSibling.value = dimIndex + 1;
-    row.querySelector('.dim-tolerance').name = `detail_${detailNum}_dim_${dimIndex}_tolerance`;
-    row.querySelector('.dim-acceptable').name = `detail_${detailNum}_dim_${dimIndex}_acceptable`;
+    // Сохранить оригинальный номер нового размера
+    const valueInput = row.querySelector('.dim-value');
+    const hiddenInput = valueInput.nextElementSibling;
+    hiddenInput.dataset.originalNumber = displayNumber;
+    
+    // Пересчитать name атрибуты для всех строк
+    renumberDimensionNames(detailNum, tbody);
     
     // Обновить счетчик
     const detailDiv = btn.closest('.detail-item');
@@ -239,13 +246,35 @@ function addDimension(detailNum, btn) {
     });
 }
 
-function renumberDimensions(detailNum) {
-    const tbody = document.querySelector(`.detail-item[data-detail-id="${detailNum}"] .dimensions-body`);
+function renumberDimensionNames(detailNum, tbody) {
     const rows = tbody.querySelectorAll('tr');
     rows.forEach((row, index) => {
         row.querySelector('.dim-index').textContent = index + 1;
-        row.querySelector('.dim-value').previousElementSibling.value = index + 1;
+        const valueInput = row.querySelector('.dim-value');
+        valueInput.name = `detail_${detailNum}_dim_${index}_value`;
+        const hiddenInput = valueInput.nextElementSibling;
+        // Сохраняем оригинальный номер для добавленных размеров
+        const numberValue = hiddenInput.dataset.originalNumber || (index + 1);
+        hiddenInput.value = numberValue;
+        row.querySelector('.dim-tolerance').name = `detail_${detailNum}_dim_${index}_tolerance`;
+        row.querySelector('.dim-acceptable').name = `detail_${detailNum}_dim_${index}_acceptable`;
+        
+        // Обновить обработчик удаления
+        const removeBtn = row.querySelector('.remove-dimension');
+        const newRemoveBtn = removeBtn.cloneNode(true);
+        removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
+        newRemoveBtn.addEventListener('click', function() {
+            row.remove();
+            const detailDiv = tbody.closest('.detail-item');
+            renumberDimensions(detailNum);
+            detailDiv.querySelector('.dim-count').value = tbody.querySelectorAll('tr').length;
+        });
     });
+}
+
+function renumberDimensions(detailNum) {
+    const tbody = document.querySelector(`.detail-item[data-detail-id="${detailNum}"] .dimensions-body`);
+    renumberDimensionNames(detailNum, tbody);
 }
 
 function renumberDetails() {
@@ -265,9 +294,10 @@ function updateDetailNumbers() {
 }
 
 // Загрузка существующих деталей (группируем размеры по detail_number)
-{% if record and record.dimensions.exists %}
+{% if record and record.groups.exists %}
     const detailsMap = {};
-    {% for dim in record.dimensions.all %}
+    {% for group in record.groups.all %}
+        {% for dim in group.dimensions.all %}
     if (!detailsMap[{{ dim.detail_number }}]) {
         detailsMap[{{ dim.detail_number }}] = { dimensions: [] };
     }
@@ -276,6 +306,7 @@ function updateDetailNumbers() {
         tolerance: '{{ dim.tolerance|escapejs }}',
         is_acceptable: {% if dim.is_acceptable %}true{% else %}false{% endif %}
     });
+        {% endfor %}
     {% endfor %}
     
     Object.keys(detailsMap).forEach(function(key) {
