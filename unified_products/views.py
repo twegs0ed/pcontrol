@@ -213,8 +213,8 @@ def export_single_product_pdf(request, pk):
             ['Изделие', product.category.name],
             ['Ответственный контролер', get_user_full_name(product.owner)],
             ['Статус', product.get_status_display()],
-            ['Дата начала проверки', product.created_at.strftime("%d.%m.%Y %H:%M")],
-            ['Дата завершения проверки', product.completed_at.strftime("%d.%m.%Y %H:%M") if product.completed_at else 'Не завершена'],
+            ['Дата начала проверки', timezone.localtime(product.created_at).strftime("%d.%m.%Y %H:%M")],
+            ['Дата завершения проверки', timezone.localtime(product.completed_at).strftime("%d.%m.%Y %H:%M") if product.completed_at else 'Не завершена'],
             ['Закрыл', get_user_full_name(product.closed_by) if product.closed_by else '-'],
             ['Прогресс', f'{product.get_filled_count()}/{product.get_total_required()} ({product.get_progress_percent()}%)'],
             ['Описание', product.description or '-'],
@@ -317,7 +317,7 @@ def export_single_product_pdf(request, pk):
         # ===== ПОДПИСЬ =====
         elements.append(Spacer(1, 30))
         elements.append(Paragraph(
-            f'<i>Отчет сформирован: {timezone.now().strftime("%d.%m.%Y %H:%M")}</i>',
+            f'<i>Отчет сформирован: {timezone.localtime(timezone.now()).strftime("%d.%m.%Y %H:%M")}</i>',
             ParagraphStyle(
                 'Footer',
                 parent=normal_style,
@@ -386,8 +386,8 @@ def export_single_product_word(request, pk):
             ('Изделие:', product.category.name),
             ('Ответственный контролер:', get_user_full_name(product.owner)),
             ('Статус:', product.get_status_display()),
-            ('Дата начала проверки:', product.created_at.strftime("%d.%m.%Y %H:%M")),
-            ('Дата завершения проверки:', product.completed_at.strftime("%d.%m.%Y %H:%M") if product.completed_at else 'Не завершена'),
+            ('Дата начала проверки:', timezone.localtime(product.created_at).strftime("%d.%m.%Y %H:%M")),
+            ('Дата завершения проверки:', timezone.localtime(product.completed_at).strftime("%d.%m.%Y %H:%M") if product.completed_at else 'Не завершена'),
             ('Закрыл:', get_user_full_name(product.closed_by) if product.closed_by else '-'),
             ('Описание:', product.description or '-'),
             ('Прогресс:', f'{product.get_filled_count()}/{product.get_total_required()} ({product.get_progress_percent()}%)'),
@@ -561,7 +561,7 @@ def export_single_product_word(request, pk):
         
         # Подпись
         doc.add_paragraph()
-        doc.add_paragraph(f'Отчет сформирован: {timezone.now().strftime("%d.%m.%Y %H:%M")}')
+        doc.add_paragraph(f'Отчет сформирован: {timezone.localtime(timezone.now()).strftime("%d.%m.%Y %H:%M")}')
         
         # Сохраняем в буфер
         buffer = io.BytesIO()
