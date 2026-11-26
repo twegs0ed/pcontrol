@@ -246,6 +246,7 @@ def export_single_product_pdf(request, pk):
         elements.append(Spacer(1, 16))
         
         # ===== ФОТОГРАФИИ =====
+        elements.append(PageBreak())
         elements.append(Paragraph('Фотографии изделия', heading_style))
         elements.append(Spacer(1, 8))
         
@@ -253,41 +254,73 @@ def export_single_product_pdf(request, pk):
         
         if images.exists():
             # Каждое изображение в отдельной строке с отступами от краев
-            for img in images:
+            for idx, img in enumerate(images):
                 try:
                     if img.image and hasattr(img.image, 'path') and img.image.path:
                         if os.path.exists(img.image.path) and os.path.getsize(img.image.path) > 0:
-                            # Создаем таблицу для изображения с отступами
-                            img_obj = Image(img.image.path, width=5.5*inch, height=5.5*inch, kind='proportional')
+                            # Добавляем разрыв страницы перед каждым блоком (кроме первого)
+                            if idx > 0:
+                                elements.append(PageBreak())
                             
-                            # Заголовок
-                            title = Paragraph(
-                                f'<b>{img.title or f"Поле {img.field_index}"}</b>',
-                                ParagraphStyle(
-                                    'ImageTitle',
-                                    parent=normal_style,
-                                    alignment=TA_CENTER,
-                                    fontSize=10,
-                                    spaceAfter=6
+                            # Определяем тип файла
+                            file_ext = os.path.splitext(img.image.path)[1].lower()
+                            video_extensions = ('.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.m4v', '.mpg', '.wmv')
+                            
+                            if file_ext in video_extensions:
+                                # Для видео выводим сообщение
+                                elements.append(Paragraph(
+                                    f'<b>{img.title or f"Поле {img.field_index}"}</b>',
+                                    ParagraphStyle(
+                                        'ImageTitle',
+                                        parent=normal_style,
+                                        alignment=TA_CENTER,
+                                        fontSize=10,
+                                        spaceAfter=6
+                                    )
+                                ))
+                                elements.append(Paragraph(
+                                    f'<i>Видеоматериал в хорошем качестве доступен в приложении к отчету.</i>',
+                                    ParagraphStyle(
+                                        'VideoNotice',
+                                        parent=normal_style,
+                                        alignment=TA_CENTER,
+                                        fontSize=9,
+                                        textColor=colors.HexColor('#666666'),
+                                        spaceAfter=12
+                                    )
+                                ))
+                            else:
+                                # Создаем таблицу для изображения с отступами
+                                img_obj = Image(img.image.path, width=5.5*inch, height=5.5*inch, kind='proportional')
+                                
+                                # Заголовок
+                                title = Paragraph(
+                                    f'<b>{img.title or f"Поле {img.field_index}"}</b>',
+                                    ParagraphStyle(
+                                        'ImageTitle',
+                                        parent=normal_style,
+                                        alignment=TA_CENTER,
+                                        fontSize=10,
+                                        spaceAfter=6
+                                    )
                                 )
-                            )
-                            
-                            # Ячейка с заголовком и изображением
-                            cell_content = [[title], [img_obj]]
-                            row_table = Table(cell_content, colWidths=[5.5*inch])
-                            row_table.setStyle(TableStyle([
-                                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                                ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                                ('SPACEBETWEEN', (0, 0), (-1, -1), 8),
-                                ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
-                                ('BACKGROUND', (0, 0), (-1, 0), colors.whitesmoke),
-                            ]))
-                            elements.append(row_table)
-                            elements.append(Spacer(1, 12))
+                                
+                                # Ячейка с заголовком и изображением
+                                cell_content = [[title], [img_obj]]
+                                row_table = Table(cell_content, colWidths=[5.5*inch])
+                                row_table.setStyle(TableStyle([
+                                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                                    ('SPACEBETWEEN', (0, 0), (-1, -1), 8),
+                                    ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
+                                    ('BACKGROUND', (0, 0), (-1, 0), colors.whitesmoke),
+                                ]))
+                                elements.append(row_table)
+                                elements.append(Spacer(1, 12))
                 except Exception as e:
                     print(f"Ошибка подготовки изображения {img.field_index}: {e}")
                     continue
@@ -297,6 +330,7 @@ def export_single_product_pdf(request, pk):
         elements.append(Spacer(1, 12))
         
         # ===== ФОТО СЕРИЙНОГО НОМЕРА =====
+        elements.append(PageBreak())
         elements.append(Paragraph('Фото серийного номера', heading_style))
         elements.append(Spacer(1, 6))
         
@@ -401,161 +435,137 @@ def export_single_product_word(request, pk):
         
         doc.add_paragraph()
         
-        # ===== ФУНКЦИЯ БЕЗОПАСНОГО ДОБАВЛЕНИЯ ИЗОБРАЖЕНИЯ =====
-        def add_image_safe(doc, image_field, title_text, width_inches=4):
-            """Безопасное добавление изображения в Word"""
-            try:
-                if not image_field:
-                    return False
-                
-                # Получаем путь к файлу
-                if hasattr(image_field, 'path') and image_field.path:
-                    image_path = image_field.path
-                else:
-                    return False
-                
-                # Проверяем существование файла
-                if not os.path.exists(image_path):
-                    doc.add_paragraph(f'⚠️ Файл не найден: {title_text}')
-                    return False
-                
-                # Проверяем размер файла
-                if os.path.getsize(image_path) == 0:
-                    doc.add_paragraph(f'⚠️ Файл пустой: {title_text}')
-                    return False
-                
-                # Пробуем добавить изображение
-                try:
-                    doc.add_picture(image_path, width=Inches(width_inches))
-                    doc.add_paragraph()
-                    return True
-                except Exception as e:
-                    print(f"Ошибка добавления изображения напрямую: {e}")
-                    
-                    # Пробуем конвертировать через PIL
-                    try:
-                        img = Image.open(image_path)
-                        
-                        # Конвертируем в RGB если нужно
-                        if img.mode in ('RGBA', 'LA', 'P'):
-                            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
-                            if img.mode == 'P':
-                                img = img.convert('RGBA')
-                            if img.mode in ('RGBA', 'LA'):
-                                rgb_img.paste(img, mask=img.split()[-1])
-                            else:
-                                rgb_img.paste(img)
-                            img = rgb_img
-                        elif img.mode != 'RGB':
-                            img = img.convert('RGB')
-                        
-                        # Сохраняем в буфер
-                        img_buffer = io.BytesIO()
-                        img.save(img_buffer, format='JPEG', quality=90)
-                        img_buffer.seek(0)
-                        
-                        # Добавляем из буфера
-                        doc.add_picture(img_buffer, width=Inches(width_inches))
-                        doc.add_paragraph()
-                        img_buffer.close()
-                        return True
-                    except Exception as e2:
-                        print(f"Ошибка конвертации: {e2}")
-                        doc.add_paragraph(f'⚠️ Не удалось обработать изображение: {title_text}')
-                        return False
-                        
-            except Exception as e:
-                print(f"Общая ошибка добавления изображения: {e}")
-                doc.add_paragraph(f'⚠️ Ошибка загрузки: {title_text}')
-                return False
-        
         # ===== ФОТОГРАФИИ =====
+        doc.add_page_break()
         doc.add_heading('Фотографии изделия', level=1)
         
         images = product.images.filter(image__isnull=False).exclude(image='').order_by('field_index')
         
         if images.exists():
             image_added = False
-            for img in images:
+            for idx, img in enumerate(images):
                 title_text = img.title or f'Поле {img.field_index}'
                 
-                # Создаем таблицу для рамки (1 колонка, 2 строки: заголовок + изображение)
-                table = doc.add_table(rows=2, cols=1)
-                table.style = 'Table Grid'
+                # Определяем тип файла
+                file_ext = os.path.splitext(img.image.path)[1].lower() if hasattr(img.image, 'path') and img.image.path else ''
+                video_extensions = ('.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.m4v', '.mpg', '.wmv')
                 
-                # Ячейка с заголовком
-                cell_title = table.cell(0, 0)
-                title_para = cell_title.paragraphs[0]
-                title_run = title_para.add_run(title_text)
-                title_run.bold = True
+                # Добавляем разрыв страницы перед каждым блоком (кроме первого)
+                if idx > 0:
+                    doc.add_page_break()
                 
-                # Ячейка с изображением
-                cell_img = table.cell(1, 0)
-                
-                # Добавляем изображение
-                try:
-                    if not img.image:
-                        raise Exception("Файл не найден")
-                    
-                    if hasattr(img.image, 'path') and img.image.path:
-                        image_path = img.image.path
-                    else:
-                        raise Exception("Ошибка пути файла")
-                    
-                    if not os.path.exists(image_path):
-                        raise Exception("Файл не найден")
-                    
-                    if os.path.getsize(image_path) == 0:
-                        raise Exception("Файл пустой")
-                    
-                    # Добавляем изображение в ячейку
-                    from docx.shared import Inches
-                    from PIL import Image as PILImage
-                    pil_img = PILImage.open(image_path)
-                    
-                    # Конвертируем в RGB если нужно
-                    if pil_img.mode in ('RGBA', 'LA', 'P'):
-                        rgb_img = PILImage.new('RGB', pil_img.size, (255, 255, 255))
-                        if pil_img.mode == 'P':
-                            pil_img = pil_img.convert('RGBA')
-                        if pil_img.mode in ('RGBA', 'LA'):
-                            rgb_img.paste(pil_img, mask=pil_img.split()[-1])
-                        else:
-                            rgb_img.paste(pil_img)
-                        pil_img = rgb_img
-                    elif pil_img.mode != 'RGB':
-                        pil_img = pil_img.convert('RGB')
-                    
-                    # Сохраняем в буфер
-                    img_buffer = io.BytesIO()
-                    pil_img.save(img_buffer, format='JPEG', quality=90)
-                    img_buffer.seek(0)
-                    
-                    # Добавляем из буфера
-                    cell_img.add_paragraph().add_run().add_picture(img_buffer, width=Inches(4))
-                    
-                    img_buffer.close()
-                    
+                if file_ext in video_extensions:
+                    # Для видео выводим сообщение
+                    doc.add_heading(title_text, level=2)
+                    doc.add_paragraph(
+                        'Видеоматериал в хорошем качестве доступен в приложении к отчету.',
+                        style='IntenseQuote'
+                    )
                     image_added = True
-                except Exception as e:
-                    print(f"Ошибка добавления изображения: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    doc.add_paragraph(f'⚠️ Ошибка загрузки: {title_text}')
-                    continue
+                else:
+                    # Создаем таблицу для рамки (1 колонка, 2 строки: заголовок + изображение)
+                    table = doc.add_table(rows=2, cols=1)
+                    table.style = 'Table Grid'
+                    
+                    # Ячейка с заголовком
+                    cell_title = table.cell(0, 0)
+                    title_para = cell_title.paragraphs[0]
+                    title_run = title_para.add_run(title_text)
+                    title_run.bold = True
+                    
+                    # Ячейка с изображением
+                    cell_img = table.cell(1, 0)
+                    
+                    # Добавляем изображение
+                    try:
+                        if not img.image:
+                            raise Exception("Файл не найден")
+                        
+                        if hasattr(img.image, 'path') and img.image.path:
+                            image_path = img.image.path
+                        else:
+                            raise Exception("Ошибка пути файла")
+                        
+                        if not os.path.exists(image_path):
+                            raise Exception("Файл не найден")
+                        
+                        if os.path.getsize(image_path) == 0:
+                            raise Exception("Файл пустой")
+                        
+                        # Добавляем изображение в ячейку
+                        from docx.shared import Inches
+                        from PIL import Image as PILImage
+                        pil_img = PILImage.open(image_path)
+                        
+                        # Конвертируем в RGB если нужно
+                        if pil_img.mode in ('RGBA', 'LA', 'P'):
+                            rgb_img = PILImage.new('RGB', pil_img.size, (255, 255, 255))
+                            if pil_img.mode == 'P':
+                                pil_img = pil_img.convert('RGBA')
+                            if pil_img.mode in ('RGBA', 'LA'):
+                                rgb_img.paste(pil_img, mask=pil_img.split()[-1])
+                            else:
+                                rgb_img.paste(pil_img)
+                            pil_img = rgb_img
+                        elif pil_img.mode != 'RGB':
+                            pil_img = pil_img.convert('RGB')
+                        
+                        # Сохраняем в буфер
+                        img_buffer = io.BytesIO()
+                        pil_img.save(img_buffer, format='JPEG', quality=90)
+                        img_buffer.seek(0)
+                        
+                        # Добавляем из буфера
+                        cell_img.add_paragraph().add_run().add_picture(img_buffer, width=Inches(4))
+                        
+                        img_buffer.close()
+                        
+                        image_added = True
+                    except Exception as e:
+                        print(f"Ошибка добавления изображения: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        doc.add_paragraph(f'⚠️ Ошибка загрузки: {title_text}')
+                        continue
             
             if not image_added:
                 doc.add_paragraph('Не удалось добавить ни одного изображения')
         else:
             doc.add_paragraph('Нет загруженных фотографий')
         
-        # Пустая строка между группами
-        doc.add_paragraph()
-        
         # ===== ФОТО СЕРИЙНОГО НОМЕРА =====
+        doc.add_page_break()
         doc.add_heading('Фото серийного номера', level=1)
         if product.serial_photo:
-            add_image_safe(doc, product.serial_photo, 'Фото серийного номера', 3)
+            try:
+                if product.serial_photo and hasattr(product.serial_photo, 'path') and product.serial_photo.path:
+                    if os.path.exists(product.serial_photo.path) and os.path.getsize(product.serial_photo.path) > 0:
+                        from docx.shared import Inches as docxInches
+                        from PIL import Image as PILImage
+                        pil_img = PILImage.open(product.serial_photo.path)
+                        if pil_img.mode in ('RGBA', 'LA', 'P'):
+                            rgb_img = PILImage.new('RGB', pil_img.size, (255, 255, 255))
+                            if pil_img.mode == 'P':
+                                pil_img = pil_img.convert('RGBA')
+                            if pil_img.mode in ('RGBA', 'LA'):
+                                rgb_img.paste(pil_img, mask=pil_img.split()[-1])
+                            else:
+                                rgb_img.paste(pil_img)
+                            pil_img = rgb_img
+                        elif pil_img.mode != 'RGB':
+                            pil_img = pil_img.convert('RGB')
+                        img_buffer = io.BytesIO()
+                        pil_img.save(img_buffer, format='JPEG', quality=90)
+                        img_buffer.seek(0)
+                        doc.add_picture(img_buffer, width=docxInches(3))
+                        img_buffer.close()
+                    else:
+                        doc.add_paragraph('Файл фото серийного номера отсутствует')
+                else:
+                    doc.add_paragraph('Нет фото серийного номера')
+            except Exception as e:
+                print(f"Ошибка добавления фото серийного номера: {e}")
+                doc.add_paragraph('Не удалось загрузить фото серийного номера')
         else:
             doc.add_paragraph('Нет фото серийного номера')
         
