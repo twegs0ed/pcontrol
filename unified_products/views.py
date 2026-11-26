@@ -614,7 +614,8 @@ class CategoryListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     ordering = ['name']
     
     def test_func(self):
-        return self.request.user.is_superuser
+        return self.request.user.is_superuser or \
+               self.request.user.has_perm('unified_products.add_category')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -632,7 +633,8 @@ class CategoryCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     success_url = reverse_lazy('unified_products:category_list')
     
     def test_func(self):
-        return self.request.user.is_superuser
+        return self.request.user.is_superuser or \
+               self.request.user.has_perm('unified_products.add_category')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -654,7 +656,8 @@ class CategoryUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     success_url = reverse_lazy('unified_products:category_list')
     
     def test_func(self):
-        return self.request.user.is_superuser
+        return self.request.user.is_superuser or \
+               self.request.user.has_perm('unified_products.change_category')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -672,7 +675,8 @@ class CategoryDeleteView(LoginRequiredMixin, UserPassesTestMixin, View):
     """Удаление категории"""
     
     def test_func(self):
-        return self.request.user.is_superuser
+        return self.request.user.is_superuser or \
+               self.request.user.has_perm('unified_products.delete_category')
     
     def post(self, request, pk):
         category = get_object_or_404(Category, pk=pk)

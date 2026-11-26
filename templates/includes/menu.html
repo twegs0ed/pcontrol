@@ -39,8 +39,8 @@
                         </a>
                     </li>
                     
-                    <!-- Категории (только для админа) -->
-                    {% if user.is_superuser %}
+                    <!-- Категории -->
+                    {% if can_create_category %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'unified_products:category_list' %}">
                                 <i class="fas fa-tags"></i> Категории
