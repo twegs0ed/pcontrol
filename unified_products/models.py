@@ -278,11 +278,11 @@ class ProductImage(models.Model):
         null=True,
         verbose_name='Заголовок'
     )
-    image = models.ImageField(
+    image = models.FileField(
         upload_to=get_upload_path,
         blank=True,
         null=True,
-        verbose_name='Изображение'
+        verbose_name='Файл (изображение/видео)'
     )
     created_at = models.DateTimeField(
         auto_now_add=True,

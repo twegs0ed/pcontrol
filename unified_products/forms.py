@@ -46,7 +46,8 @@ class ProductForm(forms.ModelForm):
             }),
             'serial_photo': forms.FileInput(attrs={
                 'class': 'form-control',
-                'accept': 'image/*'
+                'accept': 'image/*',
+                'capture':''
             }),
         }
     
@@ -79,7 +80,8 @@ class ProductImageForm(forms.ModelForm):
             }),
             'image': forms.FileInput(attrs={
                 'class': 'form-control',
-                'accept': 'image/*'
+                'accept': 'image/*',
+                'capture':''
             }),
         }
 

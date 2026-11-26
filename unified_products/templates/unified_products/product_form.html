@@ -1,5 +1,6 @@
 <!-- unified_products/templates/unified_products/product_form.html -->
 {% extends 'base.html' %}
+{% load file_tags %}
 {% load static %}
 
 {% block extra_css %}
@@ -41,6 +42,63 @@
                 }
                 .cursor-pointer {
                     cursor: pointer;
+                }
+                .upload-option-btn {
+                    padding: 10px 15px;
+                    border-radius: 8px;
+                    border: 2px solid #dee2e6;
+                    background: #fff;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    text-align: center;
+                }
+                .upload-option-btn:hover {
+                    border-color: #007bff;
+                    background: #f0f8ff;
+                    transform: translateY(-2px);
+                }
+                .upload-option-btn i {
+                    font-size: 24px;
+                    display: block;
+                    margin-bottom: 5px;
+                }
+                .upload-option-btn span {
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+                .video-preview-wrapper {
+                    position: relative;
+                    width: 100%;
+                    height: 150px;
+                    background: #000;
+                    border-radius: 4px;
+                    overflow: hidden;
+                    cursor: pointer;
+                }
+                .video-preview {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                }
+                .video-play-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(0, 0, 0, 0.4);
+                    transition: background 0.3s;
+                }
+                .video-play-overlay:hover {
+                    background: rgba(0, 0, 0, 0.6);
+                }
+                .video-play-overlay i {
+                    font-size: 48px;
+                    color: white;
+                    opacity: 0.9;
                 }
             </style>
 {% endblock %}
@@ -216,13 +274,23 @@
                                                 </span>
                                                 
                                     {% if image.image %}
+                                        {% get_file_type image.image as file_type %}
                                         <button type="button" class="btn btn-sm btn-danger delete-btn" 
                                                 onclick="deleteImage({{ object.pk }}, {{ image.field_index }})">
                                             <i class="fas fa-times"></i>
                                         </button>
-                                        <a href="{{ image.image.url }}" data-bs-toggle="modal" data-bs-target="#imageModal{{ image.field_index }}" class="cursor-pointer">
-                                            <img src="{{ image.image.url }}" class="image-preview" alt="{{ image.title|default:'Изображение' }}">
-                                        </a>
+                                        {% if file_type == 'video' %}
+                                            <div class="video-preview-wrapper">
+                                                <video src="{{ image.image.url }}" class="video-preview" preload="metadata" onclick="openVideoModal('{{ image.image.url }}', {{ image.field_index }})"></video>
+                                                <div class="video-play-overlay" onclick="openVideoModal('{{ image.image.url }}', {{ image.field_index }})">
+                                                    <i class="fas fa-play-circle"></i>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <a href="{{ image.image.url }}" data-bs-toggle="modal" data-bs-target="#imageModal{{ image.field_index }}" class="cursor-pointer">
+                                                <img src="{{ image.image.url }}" class="image-preview" alt="{{ image.title|default:'Изображение' }}">
+                                            </a>
+                                        {% endif %}
                                     {% else %}
                                         <div class="placeholder"><i class="fas fa-image"></i></div>
                                         <img src="" class="image-preview" style="display:none;">
@@ -247,21 +315,78 @@
                                             </div>
                                         </div>
                                     {% endif %}
+                                    
+                                    <!-- ===== МОДАЛЬНОЕ ОКНО ДЛЯ ПРОСМОТРА ВИДЕО ===== -->
+                                    {% if image.image %}
+                                        <div class="modal fade" id="videoModal{{ image.field_index }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                                <div class="modal-content bg-dark text-white">
+                                                    <div class="modal-header border-0">
+                                                        <h5 class="modal-title">{{ image.title|default:"Поле "|add:image.field_index }}</h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center">
+                                                        <video src="{{ image.image.url }}" class="img-fluid w-100" controls style="max-height: 70vh; background: #000;"></video>
+                                                    </div>
+                                                    <div class="modal-footer border-0">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <!-- ===== МОДАЛЬНОЕ ОКНО ЗАГРУЗКИ ===== -->
+                                    <div class="modal fade" id="uploadModal{{ image.field_index }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">
+                                                        <i class="fas fa-upload"></i> Загрузка файла
+                                                    </h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="row g-2">
+                                                        <div class="col-4">
+                                                            <div class="upload-option-btn" onclick="triggerFileUpload({{ image.field_index }}, 'photo')">
+                                                                <i class="fas fa-camera text-primary"></i>
+                                                                <span>Фото</span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <div class="upload-option-btn" onclick="triggerFileUpload({{ image.field_index }}, 'video')">
+                                                                <i class="fas fa-video text-danger"></i>
+                                                                <span>Видео</span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <div class="upload-option-btn" onclick="triggerFileUpload({{ image.field_index }}, 'gallery')">
+                                                                <i class="fas fa-folder-open text-success"></i>
+                                                                <span>Галерея</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                                 
-                                                <input type="text" class="title-input form-control form-control-sm {% if image.has_sample_image %}readonly-title{% endif %}" 
+                                                	<input type="text" class="title-input form-control form-control-sm {% if image.has_sample_image %}readonly-title{% endif %}"
                                                        value="{{ image.title|default:'' }}"
                                                        placeholder="Заголовок"
                                                        {% if image.has_sample_image %}readonly{% endif %}
                                                        onchange="saveTitle({{ object.pk }}, {{ image.field_index }}, this)">
                                                 
-                                                <div class="d-flex gap-1 mt-1">
-                                                    <div class="file-input-wrapper flex-grow-1">
-                                                        <button class="btn btn-primary btn-sm upload-btn w-100">
-                                                            <i class="fas fa-upload"></i> 
-                                                            {% if image.image %}Заменить{% else %}Загрузить{% endif %}
-                                                        </button>
-                                                        <input type="file" accept="image/*">
-                                                    </div>
+                                                	<div class="d-flex gap-1 mt-1">
+                                                	    <div class="file-input-wrapper flex-grow-1">
+                                                	        <button type="button" class="btn btn-primary btn-sm upload-btn w-100" 
+                                                	                data-bs-toggle="modal" 
+                                                	                data-bs-target="#uploadModal{{ image.field_index }}">
+                                                	            <i class="fas fa-upload"></i> 
+                                                	            {% if image.image %}Заменить{% else %}Загрузить{% endif %}
+                                                	        </button>
+                                                	    </div>
                                                     
                                                     <!-- ===== КНОПКА "ПРИМЕР" ===== -->
                                                     {% if image.has_sample_image %}
@@ -355,6 +480,13 @@
             });
         });
     });
+    
+    // ===== ОТКРЫТИЕ МОДАЛЬНОГО ОКНА ВИДЕО =====
+    window.openVideoModal = function(videoUrl, fieldIndex) {
+        const modal = new bootstrap.Modal(document.getElementById('videoModal' + fieldIndex));
+        modal.show();
+    };
+    
     console.log('===============================');
 </script>
 <script src="{% static 'unified_products/js/product_form.js' %}"></script>

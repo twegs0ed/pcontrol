@@ -1370,7 +1370,9 @@ def ajax_save_image(request, pk, field_index):
                 'error': 'У вас нет прав на редактирование'
             }, status=403)
         
-        if 'image' not in request.FILES:
+        # Поддерживаем оба ключа: 'image' и 'file'
+        uploaded_file = request.FILES.get('image') or request.FILES.get('file')
+        if not uploaded_file:
             return JsonResponse({
                 'success': False,
                 'error': 'Файл не передан'
@@ -1383,11 +1385,11 @@ def ajax_save_image(request, pk, field_index):
             defaults={'title': f'Поле {field_index}'}
         )
         
-        # Сохраняем изображение
-        image_instance.image = request.FILES['image']
+        # Сохраняем файл (изображение или видео)
+        image_instance.image = uploaded_file
         image_instance.save()
         
-        logger.info(f"Изображение сохранено: {image_instance.image.url if image_instance.image else 'None'}")
+        logger.info(f"Файл сохранен: {image_instance.image.url if image_instance.image else 'None'}, тип: {uploaded_file.content_type}")
         
         # Проверяем прогресс
         filled_count = product.get_filled_count()

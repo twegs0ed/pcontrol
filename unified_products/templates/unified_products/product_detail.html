@@ -1,6 +1,7 @@
 <!-- unified_products/templates/unified_products/product_detail.html -->
 {% extends 'base.html' %}
 {% load static %}
+{% load file_tags %}
 
 {% block content %}
 <div class="container mt-4">
@@ -157,12 +158,22 @@
                             <div class="card-body text-center">
                                 <h6 class="card-title">{{ image.title|default:"Поле "|add:image.field_index }}</h6>
                                 {% if image.image %}
-                                    <a href="#" class="image-link" data-bs-toggle="modal" data-bs-target="#imageModal" data-index="{{ forloop.counter0 }}">
-                                        <img src="{{ image.image.url }}" 
-                                             alt="{{ image.title }}" 
-                                             class="img-fluid rounded" 
-                                             style="max-height: 150px; object-fit: cover;">
-                                    </a>
+                                    {% get_file_type image.image as file_type %}
+                                    {% if file_type == 'video' %}
+                                        <div class="video-preview-detail" onclick="openVideoModalDetail('{{ image.image.url }}', '{{ image.title|default:"Поле "|add:image.field_index }}')">
+                                            <video src="{{ image.image.url }}" preload="metadata"></video>
+                                            <div class="video-play-overlay-detail">
+                                                <i class="fas fa-play-circle"></i>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <a href="#" class="image-link" data-bs-toggle="modal" data-bs-target="#imageModal" data-index="{{ forloop.counter0 }}">
+                                            <img src="{{ image.image.url }}" 
+                                                 alt="{{ image.title }}" 
+                                                 class="img-fluid rounded" 
+                                                 style="max-height: 150px; object-fit: cover;">
+                                        </a>
+                                    {% endif %}
                                 {% else %}
                                     <div class="text-muted py-4">
                                         <i class="fas fa-image fa-3x"></i>
@@ -189,7 +200,12 @@
                                     {% for image in images %}
                                         <div class="carousel-item {% if forloop.first %}active{% endif %}" data-index="{{ forloop.counter0 }}">
                                             {% if image.image %}
-                                                <img src="{{ image.image.url }}" class="d-block w-100 object-fit-contain" style="max-height: 70vh;" alt="{{ image.title }}">
+                                                {% get_file_type image.image as file_type %}
+                                                {% if file_type == 'video' %}
+                                                    <video src="{{ image.image.url }}" class="d-block w-100" controls style="max-height: 70vh; background: #000;" alt="{{ image.title }}"></video>
+                                                {% else %}
+                                                    <img src="{{ image.image.url }}" class="d-block w-100 object-fit-contain" style="max-height: 70vh;" alt="{{ image.title }}">
+                                                {% endif %}
                                             {% endif %}
                                         </div>
                                     {% endfor %}
@@ -211,12 +227,67 @@
                 </div>
             </div>
             
+            <!-- Модальное окно для просмотра видео -->
+            <div class="modal fade" id="videoModalDetail" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content bg-dark text-white">
+                        <div class="modal-header border-0">
+                            <h5 class="modal-title" id="videoModalTitle"></h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <video id="videoPlayerDetail" controls style="max-height: 70vh; width: 100%; background: #000;">
+                                <source src="" type="video/mp4">
+                                Ваш браузер не поддерживает видео.
+                            </video>
+                        </div>
+                        <div class="modal-footer border-0">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <style>
                 .object-fit-contain {
                     object-fit: contain;
                 }
                 .cursor-pointer {
                     cursor: pointer;
+                }
+                .video-preview-detail {
+                    position: relative;
+                    width: 100%;
+                    height: 150px;
+                    background: #000;
+                    border-radius: 4px;
+                    overflow: hidden;
+                    cursor: pointer;
+                }
+                .video-preview-detail video {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                }
+                .video-play-overlay-detail {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(0, 0, 0, 0.4);
+                    transition: background 0.3s;
+                }
+                .video-play-overlay-detail:hover {
+                    background: rgba(0, 0, 0, 0.6);
+                }
+                .video-play-overlay-detail i {
+                    font-size: 48px;
+                    color: white;
+                    opacity: 0.9;
                 }
             </style>
             
@@ -281,8 +352,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const activeItem = items[parseInt(index)];
-            const imageTitle = activeItem.querySelector('img')?.alt || '';
+            const video = activeItem.querySelector('video');
+            const imageTitle = activeItem.querySelector('img, video')?.alt || '';
             imageModalTitle.textContent = imageTitle;
+            
+            // Pause video from previous item
+            if (video) {
+                video.pause();
+            }
             
             if (imageCarousel) {
                 const carousel = bootstrap.Carousel.getOrCreateInstance(imageCarousel);
@@ -299,6 +376,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             modalBody.addEventListener('slide.bs.carousel', function(event) {
                 console.log('Slide event on modalBody, next index:', event.to);
+                // Pause video from current item
+                const currentItem = carouselInner.querySelector('.carousel-item.active');
+                if (currentItem) {
+                    const video = currentItem.querySelector('video');
+                    if (video) video.pause();
+                }
             });
             
             modalBody.addEventListener('slid.bs.carousel', function(event) {
@@ -317,8 +400,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             function updateTitle() {
                 const activeItem = carouselInner.querySelector('.carousel-item.active');
-                if (activeItem && activeItem.querySelector('img')) {
-                    const imageTitle = activeItem.querySelector('img').alt || '';
+                if (activeItem && activeItem.querySelector('img, video')) {
+                    const imageTitle = activeItem.querySelector('img, video').alt || '';
                     console.log('New title:', imageTitle);
                     imageModalTitle.textContent = imageTitle;
                 }
@@ -327,8 +410,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         imageModal.addEventListener('shown.bs.modal', function() {
             const activeItem = carouselInner.querySelector('.carousel-item.active');
-            if (activeItem && activeItem.querySelector('img')) {
-                const imageTitle = activeItem.querySelector('img').alt || '';
+            if (activeItem && activeItem.querySelector('img, video')) {
+                const imageTitle = activeItem.querySelector('img, video').alt || '';
                 imageModalTitle.textContent = imageTitle;
             }
             if (window.location.hash) {
@@ -338,5 +421,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ===== ОТКРЫТИЕ МОДАЛЬНОГО ОКНА ВИДЕО =====
+window.openVideoModalDetail = function(videoUrl, title) {
+    const modal = new bootstrap.Modal(document.getElementById('videoModalDetail'));
+    const videoPlayer = document.getElementById('videoPlayerDetail');
+    const videoModalTitle = document.getElementById('videoModalTitle');
+    
+    videoModalTitle.textContent = title;
+    videoPlayer.innerHTML = '<source src="' + videoUrl + '" type="video/mp4">';
+    videoPlayer.load();
+    modal.show();
+};
 </script>
 {% endblock extra_js %}

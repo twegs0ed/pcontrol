@@ -133,14 +133,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Файл:', file.name, file.type, file.size);
         
-        if (!file.type.startsWith('image/')) {
-            showToast('error', 'Пожалуйста, выберите изображение');
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+            showToast('error', 'Пожалуйста, выберите изображение или видео');
             fileInput.value = '';
             return;
         }
         
-        if (file.size > 10 * 1024 * 1024) {
-            showToast('error', 'Файл слишком большой (максимум 10MB)');
+        const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            const sizeText = file.type.startsWith('video/') ? '50MB' : '10MB';
+            showToast('error', 'Файл слишком большой (максимум ' + sizeText + ')');
             fileInput.value = '';
             return;
         }
@@ -211,8 +213,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // ===== ОБНОВЛЕНИЕ КАРТОЧКИ =====
-    function updateImageCard(card, data) {
-        console.log('updateImageCard вызван');
+    function updateImageCard(card, data, fileType) {
+        console.log('updateImageCard вызван', fileType);
         if (!card) return;
         
         const statusBadge = card.querySelector('.status-badge');
@@ -221,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const uploadBtn = card.querySelector('.upload-btn');
         const deleteBtn = card.querySelector('.delete-btn');
         
-        if (data.image_url) {
+        if (data.image_url || data.video_url) {
             card.classList.add('has-image');
             card.classList.remove('uploading', 'loading');
             
@@ -230,8 +232,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusBadge.className = 'status-badge badge bg-success';
             }
             
+            const url = data.video_url || data.image_url;
             if (preview) {
-                preview.src = data.image_url + '?t=' + Date.now();
+                preview.src = url + '?t=' + Date.now();
                 preview.style.display = 'block';
             }
             
@@ -240,7 +243,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             if (uploadBtn) {
-                uploadBtn.innerHTML = '<i class="fas fa-sync"></i> Заменить';
+                const typeText = fileType && fileType.startsWith('video/') ? 'Заменить видео' : 'Заменить';
+                uploadBtn.innerHTML = '<i class="fas fa-sync"></i> ' + typeText;
             }
             
             if (deleteBtn) {
@@ -400,6 +404,164 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
     
+
+    // ===== ОТКРЫТИЕ МОДАЛЬНОГО ОКНА ЗАГРУЗКИ =====
+    window.triggerFileUpload = function(fieldIndex, type) {
+        console.log('triggerFileUpload:', fieldIndex, type);
+        
+        // Закрываем модальное окно
+        const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal' + fieldIndex));
+        if (modal) modal.hide();
+        
+        // Создаем скрытый input
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.style.display = 'none';
+        
+        // Настраиваем в зависимости от типа
+        if (type === 'photo') {
+            fileInput.accept = 'image/*';
+            fileInput.capture = 'environment';
+        } else if (type === 'video') {
+            fileInput.accept = 'video/*';
+            fileInput.capture = 'environment';
+        } else if (type === 'gallery') {
+            fileInput.accept = 'image/*,video/*';
+            fileInput.capture = false;
+        }
+        
+        document.body.appendChild(fileInput);
+        
+        fileInput.click();
+        
+        fileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) {
+                console.log('Файл не выбран');
+                fileInput.remove();
+                return;
+            }
+            
+            console.log('Файл выбран:', file.name, file.type, file.size);
+            
+            const card = document.querySelector('.image-card[data-field="' + fieldIndex + '"]');
+            if (!card) {
+                console.log('Карточка не найдена');
+                fileInput.remove();
+                return;
+            }
+            
+            const productId = window.productId;
+            
+            if (productId) {
+                // Загружаем на сервер
+                uploadImageWithFile(productId, fieldIndex, file, card);
+            } else {
+                // Режим создания - сохраняем временно
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const hiddenInput = document.getElementById('temp_image_' + fieldIndex);
+                    if (hiddenInput) {
+                        hiddenInput.value = e.target.result;
+                        card.classList.add('has-image');
+                        const placeholder = card.querySelector('.placeholder');
+                        if (placeholder) placeholder.style.display = 'none';
+                        const preview = card.querySelector('.image-preview');
+                        if (preview) {
+                            preview.src = e.target.result;
+                            preview.style.display = 'block';
+                        }
+                        showToast('success', 'Файл выбран');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+            
+            fileInput.remove();
+        });
+    };
+    
+    // ===== ЗАГРУЗКА ФАЙЛА (ИЗОБРАЖЕНИЕ ИЛИ ВИДЕО) =====
+    function uploadImageWithFile(productId, fieldIndex, file, card) {
+        console.log('uploadImageWithFile вызван:', productId, fieldIndex, file.name, file.type);
+        
+        if (!productId) {
+            console.error('productId не передан!');
+            showToast('error', 'Ошибка: ID продукта не найден');
+            return;
+        }
+        
+        // Проверка типа файла
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+            showToast('error', 'Пожалуйста, выберите изображение или видео');
+            return;
+        }
+        
+        // Ограничение размера
+        const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            const sizeText = file.type.startsWith('video/') ? '50MB' : '10MB';
+            showToast('error', 'Файл слишком большой (максимум ' + sizeText + ')');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        card.classList.add('uploading', 'loading');
+        const progress = card.querySelector('.upload-progress .progress-bar');
+        if (progress) {
+            progress.style.width = '0%';
+        }
+        
+        const url = '/unified-products/ajax/save-image/' + productId + '/' + fieldIndex + '/';
+        console.log('Отправка запроса на:', url);
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: formData
+        })
+        .then(response => {
+            console.log('Ответ получен, статус:', response.status);
+            if (!response.ok) {
+                throw new Error('HTTP ошибка: ' + response.status);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Данные ответа:', data);
+            if (data.success) {
+                updateImageCard(card, data, file.type);
+                updateProgress(data);
+                const typeText = file.type.startsWith('video/') ? 'Видео' : 'Изображение';
+                showToast('success', typeText + ' загружено!');
+                
+                if (data.is_completed && data.redirect_url) {
+                    setTimeout(function() {
+                        showToast('success', '✅ Все фото загружены! Перенаправление...');
+                        setTimeout(function() {
+                            window.location.href = data.redirect_url;
+                        }, 2000);
+                    }, 500);
+                }
+            } else {
+                console.log('Ошибка от сервера:', data.error);
+                showToast('error', data.error || 'Ошибка загрузки');
+                card.classList.remove('uploading', 'loading');
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            showToast('error', 'Ошибка соединения с сервером: ' + error.message);
+            card.classList.remove('uploading', 'loading');
+        });
+    }
+    
     // ===== ПОДКЛЮЧАЕМ ОБРАБОТЧИКИ ДЛЯ ФАЙЛОВЫХ ИНПУТОВ =====
     document.querySelectorAll('.image-card .file-input-wrapper input[type="file"]').forEach(function(input) {
         console.log('Найден input файла');
@@ -545,8 +707,8 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Файл выбран:', file.name, file.size, file.type);
             
             // Проверка типа файла
-            if (!file.type.startsWith('image/')) {
-                showToast('error', 'Пожалуйста, выберите изображение');
+            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+                showToast('error', 'Пожалуйста, выберите изображение или видео');
                 fileInput.remove();
                 return;
             }
